@@ -79,10 +79,35 @@ export const userPreferences = pgTable("user_preferences", {
   currency: text("currency").default("USD"),
   timezone: text("timezone").default("UTC"),
   
-  // Notification preferences
+  // Basic notification preferences
   emailNotifications: boolean("email_notifications").default(true),
   smsNotifications: boolean("sms_notifications").default(false),
   pushNotifications: boolean("push_notifications").default(true),
+  
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// User settings table for advanced preferences
+export const userSettings = pgTable("user_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  
+  // Notification preferences
+  orderUpdates: boolean("order_updates").default(true),
+  promotionalEmails: boolean("promotional_emails").default(false),
+  productRecommendations: boolean("product_recommendations").default(true),
+  securityAlerts: boolean("security_alerts").default(true),
+  
+  // Privacy settings
+  dataAnalytics: boolean("data_analytics").default(false),
+  personalizedRecommendations: boolean("personalized_recommendations").default(true),
+  marketingCommunications: boolean("marketing_communications").default(false),
+  activityTracking: boolean("activity_tracking").default(false),
+  
+  // Preferences
+  theme: text("theme").default("system"), // light, dark, system
+  language: text("language").default("en"),
   
   createdAt: timestamp("created_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`)
@@ -194,6 +219,7 @@ export const reviews = pgTable("reviews", {
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   preferences: one(userPreferences),
+  settings: one(userSettings),
   addresses: many(addresses),
   cartItems: many(cartItems),
   orders: many(orders),
@@ -206,6 +232,13 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
   user: one(users, {
     fields: [userPreferences.userId],
+    references: [users.id]
+  })
+}));
+
+export const userSettingsRelations = relations(userSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [userSettings.userId],
     references: [users.id]
   })
 }));
@@ -311,6 +344,12 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).o
   updatedAt: true
 });
 
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 export const insertRefreshTokenSchema = createInsertSchema(refreshTokens).omit({
   id: true,
   createdAt: true
@@ -387,6 +426,15 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8).max(100)
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your password")
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 export const verifyEmailSchema = z.object({
   token: z.string()
 });
@@ -401,6 +449,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;

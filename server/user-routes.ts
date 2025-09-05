@@ -2,6 +2,8 @@ import type { Express, Request, Response } from 'express';
 import { z } from 'zod';
 import { storage } from './storage';
 import { authenticateToken, requireAdmin } from './auth-routes';
+import { changePasswordSchema } from '@shared/schema';
+import bcrypt from 'bcrypt';
 
 // Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {
@@ -29,6 +31,28 @@ const updateUserPreferencesSchema = z.object({
   emailNotifications: z.boolean().optional(),
   smsNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional()
+});
+
+const updateUserSettingsSchema = z.object({
+  notifications: z.object({
+    orderUpdates: z.boolean().optional(),
+    promotionalEmails: z.boolean().optional(),
+    productRecommendations: z.boolean().optional(),
+    securityAlerts: z.boolean().optional()
+  }).optional(),
+  privacy: z.object({
+    dataAnalytics: z.boolean().optional(),
+    personalizedRecommendations: z.boolean().optional(),
+    marketingCommunications: z.boolean().optional(),
+    activityTracking: z.boolean().optional()
+  }).optional(),
+  security: z.object({
+    twoFactorEnabled: z.boolean().optional()
+  }).optional(),
+  preferences: z.object({
+    theme: z.enum(['light', 'dark', 'system']).optional(),
+    language: z.string().min(2).max(5).optional()
+  }).optional()
 });
 
 const uploadAvatarSchema = z.object({
@@ -384,6 +408,180 @@ export function setupUserRoutes(app: Express) {
       
     } catch (error: any) {
       console.error('Admin update user status error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // User Settings Management
+
+  // GET /api/v1/users/{userId}/settings
+  app.get('/api/v1/users/:userId/settings', authenticateToken, authorizeUserAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      let settings = await storage.getUserSettings(userId);
+      
+      // Create default settings if they don't exist
+      if (!settings) {
+        settings = await storage.createUserSettings({
+          userId,
+          orderUpdates: true,
+          promotionalEmails: false,
+          productRecommendations: true,
+          securityAlerts: true,
+          dataAnalytics: false,
+          personalizedRecommendations: true,
+          marketingCommunications: false,
+          activityTracking: false,
+          theme: 'system',
+          language: 'en'
+        });
+      }
+      
+      // Transform settings to match frontend structure
+      const transformedSettings = {
+        notifications: {
+          orderUpdates: settings.orderUpdates,
+          promotionalEmails: settings.promotionalEmails,
+          productRecommendations: settings.productRecommendations,
+          securityAlerts: settings.securityAlerts
+        },
+        privacy: {
+          dataAnalytics: settings.dataAnalytics,
+          personalizedRecommendations: settings.personalizedRecommendations,
+          marketingCommunications: settings.marketingCommunications,
+          activityTracking: settings.activityTracking
+        },
+        security: {
+          twoFactorEnabled: existingUser.twoFactorEnabled
+        },
+        preferences: {
+          theme: settings.theme,
+          language: settings.language
+        }
+      };
+      
+      res.json({ settings: transformedSettings });
+      
+    } catch (error: any) {
+      console.error('Get user settings error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // PUT /api/v1/users/{userId}/settings
+  app.put('/api/v1/users/:userId/settings', authenticateToken, authorizeUserAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const updateData = updateUserSettingsSchema.parse(req.body);
+      
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      // Transform frontend structure to database structure
+      const settingsUpdate: any = {};
+      
+      if (updateData.notifications) {
+        Object.assign(settingsUpdate, updateData.notifications);
+      }
+      
+      if (updateData.privacy) {
+        Object.assign(settingsUpdate, updateData.privacy);
+      }
+      
+      if (updateData.preferences) {
+        Object.assign(settingsUpdate, updateData.preferences);
+      }
+      
+      // Update user settings
+      const updatedSettings = await storage.updateUserSettings(userId, settingsUpdate);
+      
+      // Handle security settings (2FA) separately since it's in the users table
+      if (updateData.security?.twoFactorEnabled !== undefined) {
+        await storage.updateUser(userId, { 
+          twoFactorEnabled: updateData.security.twoFactorEnabled 
+        });
+      }
+      
+      res.json({
+        message: 'Settings updated successfully',
+        settings: updatedSettings
+      });
+      
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Validation error', 
+          errors: error.errors 
+        });
+      }
+      
+      console.error('Update user settings error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // PUT /api/v1/users/{userId}/password
+  app.put('/api/v1/users/:userId/password', authenticateToken, authorizeUserAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+      
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      const success = await storage.changePassword(userId, currentPassword, newPassword);
+      
+      if (!success) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+      
+      res.json({
+        message: 'Password changed successfully'
+      });
+      
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Validation error', 
+          errors: error.errors 
+        });
+      }
+      
+      console.error('Change password error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // GET /api/v1/users/{userId}/export
+  app.get('/api/v1/users/:userId/export', authenticateToken, authorizeUserAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      const exportData = await storage.exportUserData(userId);
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="user-data-export-${userId}-${Date.now()}.json"`);
+      
+      res.json(exportData);
+      
+    } catch (error: any) {
+      console.error('Export user data error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

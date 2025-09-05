@@ -1,11 +1,12 @@
 import { 
   users, categories, products, addresses, cartItems, orders, orderItems, reviews,
-  userPreferences, refreshTokens, passwordResetTokens, loginSessions,
+  userPreferences, userSettings, refreshTokens, passwordResetTokens, loginSessions,
   type User, type InsertUser, type Category, type InsertCategory, 
   type Product, type InsertProduct, type Address, type InsertAddress,
   type CartItem, type InsertCartItem, type Order, type InsertOrder,
   type OrderItem, type InsertOrderItem, type Review, type InsertReview,
   type UserPreferences, type InsertUserPreferences,
+  type UserSettings, type InsertUserSettings,
   type RefreshToken, type InsertRefreshToken,
   type PasswordResetToken, type InsertPasswordResetToken,
   type LoginSession, type InsertLoginSession
@@ -38,6 +39,17 @@ export interface IStorage {
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
   updateUserPreferences(userId: string, preferences: Partial<InsertUserPreferences>): Promise<UserPreferences>;
+
+  // User Settings
+  getUserSettings(userId: string): Promise<UserSettings | undefined>;
+  createUserSettings(settings: InsertUserSettings): Promise<UserSettings>;
+  updateUserSettings(userId: string, settings: Partial<InsertUserSettings>): Promise<UserSettings>;
+
+  // Password Management
+  changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
+
+  // Data Export
+  exportUserData(userId: string): Promise<any>;
   
   // Email Verification
   setEmailVerificationToken(userId: string, token: string): Promise<void>;
@@ -672,6 +684,131 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReview(id: string): Promise<void> {
     await db.delete(reviews).where(eq(reviews.id, id));
+  }
+
+  // User Settings
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    const [settings] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
+    return settings || undefined;
+  }
+
+  async createUserSettings(settings: InsertUserSettings): Promise<UserSettings> {
+    const [newSettings] = await db.insert(userSettings).values(settings).returning();
+    return newSettings;
+  }
+
+  async updateUserSettings(userId: string, settingsUpdate: Partial<InsertUserSettings>): Promise<UserSettings> {
+    const existingSettings = await this.getUserSettings(userId);
+    
+    if (!existingSettings) {
+      // Create new settings if they don't exist
+      const defaultSettings: InsertUserSettings = {
+        userId,
+        orderUpdates: true,
+        promotionalEmails: false,
+        productRecommendations: true,
+        securityAlerts: true,
+        dataAnalytics: false,
+        personalizedRecommendations: true,
+        marketingCommunications: false,
+        activityTracking: false,
+        theme: "system",
+        language: "en",
+        ...settingsUpdate
+      };
+      return await this.createUserSettings(defaultSettings);
+    }
+
+    const [updatedSettings] = await db
+      .update(userSettings)
+      .set({ ...settingsUpdate, updatedAt: sql`now()` })
+      .where(eq(userSettings.userId, userId))
+      .returning();
+    return updatedSettings;
+  }
+
+  // Password Management
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      return false;
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentPasswordValid) {
+      return false;
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and last password change timestamp
+    await db
+      .update(users)
+      .set({ 
+        passwordHash: hashedNewPassword,
+        lastPasswordChange: sql`now()`,
+        updatedAt: sql`now()`
+      })
+      .where(eq(users.id, userId));
+
+    return true;
+  }
+
+  // Data Export
+  async exportUserData(userId: string): Promise<any> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get all user-related data
+    const [userPrefs, userSettingsData, userAddresses, userOrders, userReviews, userCartItems] = await Promise.all([
+      this.getUserPreferences(userId),
+      this.getUserSettings(userId),
+      this.getUserAddresses(userId),
+      this.getOrders(userId),
+      db.select().from(reviews).where(eq(reviews.userId, userId)),
+      this.getCartItems(userId)
+    ]);
+
+    // Remove sensitive data
+    const { passwordHash, twoFactorSecret, emailVerificationToken, phoneVerificationToken, ...safeUserData } = user;
+
+    return {
+      user: safeUserData,
+      preferences: userPrefs,
+      settings: userSettingsData,
+      addresses: userAddresses,
+      orders: userOrders.map(order => ({
+        ...order,
+        orderItems: order.orderItems.map(item => ({
+          ...item,
+          product: {
+            name: item.product.name,
+            price: item.product.price,
+            imageUrl: item.product.imageUrl
+          }
+        }))
+      })),
+      reviews: userReviews,
+      cart: userCartItems.map(item => ({
+        quantity: item.quantity,
+        product: {
+          name: item.product.name,
+          price: item.product.price,
+          imageUrl: item.product.imageUrl
+        },
+        addedAt: item.createdAt
+      })),
+      exportedAt: new Date(),
+      dataRetentionInfo: {
+        description: "This export contains all your personal data stored in our system.",
+        retentionPeriod: "Data is retained for account management and order history purposes.",
+        deletionRights: "You can request account deletion at any time through your account settings."
+      }
+    };
   }
 }
 

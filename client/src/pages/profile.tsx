@@ -251,6 +251,17 @@ export default function Profile() {
     }
   });
 
+  // Load user settings from backend
+  const { data: userSettings } = useQuery({
+    queryKey: [`/api/v1/users/${user?.id}/settings`],
+    enabled: !!user?.id,
+    onSuccess: (data: any) => {
+      if (data?.settings) {
+        setSettings(data.settings);
+      }
+    }
+  });
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -378,11 +389,41 @@ export default function Profile() {
     await changePasswordMutation.mutateAsync(data);
   };
 
-  const handleDataExport = () => {
-    toast({
-      title: "Data Export",
-      description: "Your data export will be sent to your email address within 24 hours"
-    });
+  const handleDataExport = async () => {
+    try {
+      const response = await fetch(`/api/v1/users/${user?.id}/export`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export data');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `user-data-export-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Data Export",
+        description: "Your data has been downloaded successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export data",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
