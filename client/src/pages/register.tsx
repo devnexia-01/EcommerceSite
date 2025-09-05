@@ -18,7 +18,7 @@ const registerSchema = z.object({
   confirmPassword: z.string(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  phone: z.string().optional()
+  phoneNumber: z.string().optional()
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
@@ -41,7 +41,7 @@ export default function Register() {
       confirmPassword: "",
       firstName: "",
       lastName: "",
-      phone: ""
+      phoneNumber: ""
     }
   });
 
@@ -153,7 +153,7 @@ export default function Register() {
 
               <FormField
                 control={form.control}
-                name="phone"
+                name="phoneNumber"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Phone Number (Optional)</FormLabel>

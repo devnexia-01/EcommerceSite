@@ -5,38 +5,23 @@ import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { insertUserSchema, insertProductSchema, insertCategorySchema, insertAddressSchema, insertCartItemSchema, insertOrderSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
+import { setupAuthRoutes, authenticateToken, requireAdmin } from "./auth-routes";
+import { setupUserRoutes } from "./user-routes";
 
-// Extend Express Request interface to include session
-declare module 'express-session' {
-  export interface SessionData {
-    userId?: string;
-  }
-}
-
+// Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {
-  session: Session & {
-    userId?: string;
+  user?: {
+    userId: string;
+    email: string;
+    isAdmin?: boolean;
   };
 }
 
-// Auth middleware
-const requireAuth = (req: Request, res: Response, next: any) => {
+// Legacy session auth middleware for backward compatibility
+const requireSessionAuth = (req: Request, res: Response, next: any) => {
   if (!req.session?.userId) {
     return res.status(401).json({ message: "Authentication required" });
   }
-  next();
-};
-
-const requireAdmin = async (req: Request, res: Response, next: any) => {
-  if (!req.session?.userId) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-  
-  const user = await storage.getUser(req.session.userId);
-  if (!user?.isAdmin) {
-    return res.status(403).json({ message: "Admin access required" });
-  }
-  
   next();
 };
 
@@ -49,7 +34,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  // Auth routes
+  // Setup comprehensive authentication routes
+  setupAuthRoutes(app);
+  
+  // Setup user profile management routes
+  setupUserRoutes(app);
+
+  // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.parse(req.body);
@@ -62,10 +53,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User already exists" });
       }
 
-      const user = await storage.createUser(userData);
+      const user = await storage.createUser(userData as any);
       req.session!.userId = user.id;
       
-      res.json({ user: { ...user, password: undefined } });
+      res.json({ user: { ...user, passwordHash: undefined } });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -80,13 +71,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const isValid = await bcrypt.compare(password, user.password);
+      const isValid = await bcrypt.compare(password, user.passwordHash);
       if (!isValid) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
       req.session!.userId = user.id;
-      res.json({ user: { ...user, password: undefined } });
+      res.json({ user: { ...user, passwordHash: undefined } });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -97,14 +88,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Logged out successfully" });
   });
 
-  app.get("/api/auth/me", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/auth/me", requireSessionAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session!.userId!;
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json({ user: { ...user, password: undefined } });
+      res.json({ user: { ...user, passwordHash: undefined } });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -230,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cart routes
-  app.get("/api/cart", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/cart", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.session!.userId!;
       const cartItems = await storage.getCartItems(userId);
@@ -240,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cart", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/cart", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const cartData = insertCartItemSchema.parse({
         ...req.body,
@@ -254,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/cart/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/cart/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { quantity } = req.body;
       const cartItem = await storage.updateCartItem(req.params.id, quantity);
@@ -264,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/cart/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/cart/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       await storage.removeCartItem(req.params.id);
       res.json({ message: "Item removed from cart" });
@@ -273,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/cart", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/cart", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.session!.userId!;
       await storage.clearCart(userId);
@@ -284,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Address routes
-  app.get("/api/addresses", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/addresses", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.session!.userId!;
       const addresses = await storage.getUserAddresses(userId);
@@ -294,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/addresses", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/addresses", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const addressData = insertAddressSchema.parse({
         ...req.body,
@@ -308,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/addresses/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/addresses/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const addressData = insertAddressSchema.partial().parse(req.body);
       const address = await storage.updateAddress(req.params.id, addressData);
@@ -318,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/addresses/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/addresses/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       await storage.deleteAddress(req.params.id);
       res.json({ message: "Address deleted successfully" });
@@ -328,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order routes
-  app.get("/api/orders", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const orders = await storage.getOrders(req.session!.userId);
       res.json(orders);
@@ -337,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/orders/:id", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/orders/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -349,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/orders", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { orderItems, ...orderData } = req.body;
       
@@ -403,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/reviews", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reviews", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const reviewData = insertReviewSchema.parse({
         ...req.body,

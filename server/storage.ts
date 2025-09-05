@@ -1,9 +1,14 @@
 import { 
   users, categories, products, addresses, cartItems, orders, orderItems, reviews,
+  userPreferences, refreshTokens, passwordResetTokens, loginSessions,
   type User, type InsertUser, type Category, type InsertCategory, 
   type Product, type InsertProduct, type Address, type InsertAddress,
   type CartItem, type InsertCartItem, type Order, type InsertOrder,
-  type OrderItem, type InsertOrderItem, type Review, type InsertReview
+  type OrderItem, type InsertOrderItem, type Review, type InsertReview,
+  type UserPreferences, type InsertUserPreferences,
+  type RefreshToken, type InsertRefreshToken,
+  type PasswordResetToken, type InsertPasswordResetToken,
+  type LoginSession, type InsertLoginSession
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
@@ -16,6 +21,40 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
+  
+  // Authentication
+  getUserWithPreferences(id: string): Promise<(User & { preferences?: UserPreferences }) | undefined>;
+  createRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
+  getRefreshToken(token: string): Promise<RefreshToken | undefined>;
+  deleteRefreshToken(token: string): Promise<void>;
+  deleteUserRefreshTokens(userId: string): Promise<void>;
+  
+  // Password Reset
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(token: string): Promise<void>;
+  
+  // User Preferences
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
+  updateUserPreferences(userId: string, preferences: Partial<InsertUserPreferences>): Promise<UserPreferences>;
+  
+  // Email Verification
+  setEmailVerificationToken(userId: string, token: string): Promise<void>;
+  verifyEmail(token: string): Promise<User | undefined>;
+  
+  // Login Sessions
+  createLoginSession(session: InsertLoginSession): Promise<LoginSession>;
+  getLoginSession(token: string): Promise<LoginSession | undefined>;
+  updateSessionActivity(token: string): Promise<void>;
+  deleteLoginSession(token: string): Promise<void>;
+  deleteUserSessions(userId: string): Promise<void>;
+  
+  // Account Security
+  incrementLoginAttempts(email: string): Promise<void>;
+  resetLoginAttempts(email: string): Promise<void>;
+  lockAccount(email: string, lockoutMinutes?: number): Promise<void>;
+  unlockAccount(email: string): Promise<void>;
   
   // Categories
   getCategories(): Promise<Category[]>;
@@ -87,18 +126,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    const hashedPassword = await bcrypt.hash(insertUser.passwordHash, 10);
     const [user] = await db
       .insert(users)
-      .values({ ...insertUser, password: hashedPassword })
+      .values({ ...insertUser, passwordHash: hashedPassword })
       .returning();
     return user;
   }
 
   async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User> {
     const updates = { ...userUpdate };
-    if (updates.password) {
-      updates.password = await bcrypt.hash(updates.password, 10);
+    if (updates.passwordHash) {
+      updates.passwordHash = await bcrypt.hash(updates.passwordHash, 10);
     }
     const [user] = await db
       .update(users)
@@ -106,6 +145,197 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  // Authentication methods
+  async getUserWithPreferences(id: string): Promise<(User & { preferences?: UserPreferences }) | undefined> {
+    const results = await db
+      .select()
+      .from(users)
+      .leftJoin(userPreferences, eq(users.id, userPreferences.userId))
+      .where(eq(users.id, id));
+    
+    if (results.length === 0) return undefined;
+    
+    const result = results[0];
+    return {
+      ...result.users,
+      preferences: result.user_preferences || undefined
+    };
+  }
+
+  async createRefreshToken(token: InsertRefreshToken): Promise<RefreshToken> {
+    const [newToken] = await db.insert(refreshTokens).values(token).returning();
+    return newToken;
+  }
+
+  async getRefreshToken(token: string): Promise<RefreshToken | undefined> {
+    const [refreshToken] = await db
+      .select()
+      .from(refreshTokens)
+      .where(and(
+        eq(refreshTokens.token, token),
+        sql`expires_at > NOW()`
+      ));
+    return refreshToken || undefined;
+  }
+
+  async deleteRefreshToken(token: string): Promise<void> {
+    await db.delete(refreshTokens).where(eq(refreshTokens.token, token));
+  }
+
+  async deleteUserRefreshTokens(userId: string): Promise<void> {
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+  }
+
+  // Password Reset methods
+  async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [newToken] = await db.insert(passwordResetTokens).values(token).returning();
+    return newToken;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(and(
+        eq(passwordResetTokens.token, token),
+        eq(passwordResetTokens.used, false),
+        sql`expires_at > NOW()`
+      ));
+    return resetToken || undefined;
+  }
+
+  async markPasswordResetTokenUsed(token: string): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.token, token));
+  }
+
+  // User Preferences methods
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [preferences] = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    return preferences || undefined;
+  }
+
+  async createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    const [newPreferences] = await db.insert(userPreferences).values(preferences).returning();
+    return newPreferences;
+  }
+
+  async updateUserPreferences(userId: string, preferencesUpdate: Partial<InsertUserPreferences>): Promise<UserPreferences> {
+    const [preferences] = await db
+      .update(userPreferences)
+      .set({ ...preferencesUpdate, updatedAt: sql`now()` })
+      .where(eq(userPreferences.userId, userId))
+      .returning();
+    return preferences;
+  }
+
+  // Email Verification methods
+  async setEmailVerificationToken(userId: string, token: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        emailVerificationToken: token,
+        updatedAt: sql`now()` 
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async verifyEmail(token: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ 
+        emailVerified: true, 
+        emailVerificationToken: null,
+        updatedAt: sql`now()` 
+      })
+      .where(eq(users.emailVerificationToken, token))
+      .returning();
+    return user || undefined;
+  }
+
+  // Login Session methods
+  async createLoginSession(session: InsertLoginSession): Promise<LoginSession> {
+    const [newSession] = await db.insert(loginSessions).values(session).returning();
+    return newSession;
+  }
+
+  async getLoginSession(token: string): Promise<LoginSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(loginSessions)
+      .where(and(
+        eq(loginSessions.sessionToken, token),
+        sql`expires_at > NOW()`
+      ));
+    return session || undefined;
+  }
+
+  async updateSessionActivity(token: string): Promise<void> {
+    await db
+      .update(loginSessions)
+      .set({ lastActiveAt: sql`now()` })
+      .where(eq(loginSessions.sessionToken, token));
+  }
+
+  async deleteLoginSession(token: string): Promise<void> {
+    await db.delete(loginSessions).where(eq(loginSessions.sessionToken, token));
+  }
+
+  async deleteUserSessions(userId: string): Promise<void> {
+    await db.delete(loginSessions).where(eq(loginSessions.userId, userId));
+  }
+
+  // Account Security methods
+  async incrementLoginAttempts(email: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        loginAttempts: sql`login_attempts + 1`,
+        updatedAt: sql`now()` 
+      })
+      .where(eq(users.email, email));
+  }
+
+  async resetLoginAttempts(email: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        loginAttempts: 0,
+        accountLocked: false,
+        lockoutUntil: null,
+        updatedAt: sql`now()` 
+      })
+      .where(eq(users.email, email));
+  }
+
+  async lockAccount(email: string, lockoutMinutes: number = 30): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        accountLocked: true,
+        lockoutUntil: sql`NOW() + INTERVAL '${lockoutMinutes} minutes'`,
+        updatedAt: sql`now()` 
+      })
+      .where(eq(users.email, email));
+  }
+
+  async unlockAccount(email: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        accountLocked: false,
+        lockoutUntil: null,
+        loginAttempts: 0,
+        updatedAt: sql`now()` 
+      })
+      .where(eq(users.email, email));
   }
 
   // Categories

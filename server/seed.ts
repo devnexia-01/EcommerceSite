@@ -9,10 +9,11 @@ async function seed() {
     await db.insert(users).values({
       email: "admin@example.com",
       username: "admin",
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: "Admin",
       lastName: "User",
-      isAdmin: true
+      isAdmin: true,
+      emailVerified: true
     }).onConflictDoNothing();
 
     // Create sample categories
