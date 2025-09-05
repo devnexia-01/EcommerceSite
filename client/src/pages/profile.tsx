@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { User, MapPin, Package, Settings, Heart, CreditCard } from "lucide-react";
+import { User, MapPin, Package, Settings, Heart, CreditCard, Shield, Download, Palette, Globe, Key, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,12 +39,46 @@ const addressSchema = z.object({
   isDefault: z.boolean().default(false)
 });
 
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your password")
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 type ProfileFormData = z.infer<typeof profileSchema>;
 type AddressFormData = z.infer<typeof addressSchema>;
+type PasswordChangeFormData = z.infer<typeof passwordChangeSchema>;
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState("profile");
   const [editingAddress, setEditingAddress] = useState<string | null>(null);
+  
+  // Settings state
+  const [settings, setSettings] = useState({
+    notifications: {
+      orderUpdates: true,
+      promotionalEmails: false,
+      productRecommendations: true,
+      securityAlerts: true
+    },
+    privacy: {
+      dataAnalytics: false,
+      personalizedRecommendations: true,
+      marketingCommunications: false,
+      activityTracking: false
+    },
+    security: {
+      twoFactorEnabled: false,
+    },
+    preferences: {
+      theme: "system",
+      language: "en"
+    }
+  });
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +105,15 @@ export default function Profile() {
       zipCode: "",
       country: "US",
       isDefault: false
+    }
+  });
+
+  const passwordForm = useForm<PasswordChangeFormData>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: ""
     }
   });
 
@@ -170,6 +215,42 @@ export default function Profile() {
     }
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: (data: PasswordChangeFormData) => apiRequest("PUT", `/api/v1/users/${user?.id}/password`, data),
+    onSuccess: () => {
+      passwordForm.reset();
+      setShowPasswordChange(false);
+      toast({
+        title: "Success",
+        description: "Password changed successfully"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: (newSettings: typeof settings) => apiRequest("PUT", `/api/v1/users/${user?.id}/settings`, newSettings),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Settings updated successfully"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update settings",
+        variant: "destructive"
+      });
+    }
+  });
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -243,6 +324,65 @@ export default function Profile() {
         }
       }
     }
+  };
+
+  const updateNotificationSetting = (key: keyof typeof settings.notifications, value: boolean) => {
+    const newSettings = {
+      ...settings,
+      notifications: {
+        ...settings.notifications,
+        [key]: value
+      }
+    };
+    setSettings(newSettings);
+    updateSettingsMutation.mutate(newSettings);
+  };
+
+  const updatePrivacySetting = (key: keyof typeof settings.privacy, value: boolean) => {
+    const newSettings = {
+      ...settings,
+      privacy: {
+        ...settings.privacy,
+        [key]: value
+      }
+    };
+    setSettings(newSettings);
+    updateSettingsMutation.mutate(newSettings);
+  };
+
+  const updateSecuritySetting = (key: keyof typeof settings.security, value: boolean) => {
+    const newSettings = {
+      ...settings,
+      security: {
+        ...settings.security,
+        [key]: value
+      }
+    };
+    setSettings(newSettings);
+    updateSettingsMutation.mutate(newSettings);
+  };
+
+  const updatePreferenceSetting = (key: keyof typeof settings.preferences, value: string) => {
+    const newSettings = {
+      ...settings,
+      preferences: {
+        ...settings.preferences,
+        [key]: value
+      }
+    };
+    setSettings(newSettings);
+    updateSettingsMutation.mutate(newSettings);
+  };
+
+  const onChangePassword = async (data: PasswordChangeFormData) => {
+    await changePasswordMutation.mutateAsync(data);
+  };
+
+  const handleDataExport = () => {
+    toast({
+      title: "Data Export",
+      description: "Your data export will be sent to your email address within 24 hours"
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -660,47 +800,365 @@ export default function Profile() {
 
           {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-6 mt-6">
+            {/* Notification Preferences */}
             <Card>
               <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Notification Preferences
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Order Updates</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Get notified about order confirmations and shipping updates
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.notifications.orderUpdates}
+                    onCheckedChange={(checked) => updateNotificationSetting('orderUpdates', checked)}
+                    data-testid="toggle-order-updates"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Promotional Emails</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Receive special offers and promotional content
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.notifications.promotionalEmails}
+                    onCheckedChange={(checked) => updateNotificationSetting('promotionalEmails', checked)}
+                    data-testid="toggle-promotional-emails"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Product Recommendations</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Get personalized product suggestions
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.notifications.productRecommendations}
+                    onCheckedChange={(checked) => updateNotificationSetting('productRecommendations', checked)}
+                    data-testid="toggle-product-recommendations"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Security Alerts</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Important notifications about account security
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.notifications.securityAlerts}
+                    onCheckedChange={(checked) => updateNotificationSetting('securityAlerts', checked)}
+                    data-testid="toggle-security-alerts"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Privacy Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Privacy Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Data Analytics</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Allow usage data collection for service improvement
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.privacy.dataAnalytics}
+                    onCheckedChange={(checked) => updatePrivacySetting('dataAnalytics', checked)}
+                    data-testid="toggle-data-analytics"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Personalized Recommendations</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Use your browsing history for better recommendations
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.privacy.personalizedRecommendations}
+                    onCheckedChange={(checked) => updatePrivacySetting('personalizedRecommendations', checked)}
+                    data-testid="toggle-personalized-recommendations"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Marketing Communications</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Share your data with marketing partners
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.privacy.marketingCommunications}
+                    onCheckedChange={(checked) => updatePrivacySetting('marketingCommunications', checked)}
+                    data-testid="toggle-marketing-communications"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Activity Tracking</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Track browsing activity for analytics
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.privacy.activityTracking}
+                    onCheckedChange={(checked) => updatePrivacySetting('activityTracking', checked)}
+                    data-testid="toggle-activity-tracking"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Security Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="h-5 w-5" />
+                  Security Settings
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <h4 className="font-medium mb-2">Notification Preferences</h4>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <p>• Order confirmations and updates</p>
-                    <p>• Promotional emails and offers</p>
-                    <p>• Product recommendations</p>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Two-Factor Authentication</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Add an extra layer of security to your account
+                    </div>
                   </div>
+                  <Switch
+                    checked={settings.security.twoFactorEnabled}
+                    onCheckedChange={(checked) => updateSecuritySetting('twoFactorEnabled', checked)}
+                    data-testid="toggle-two-factor"
+                  />
                 </div>
 
                 <Separator />
 
                 <div>
-                  <h4 className="font-medium mb-2">Privacy</h4>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <p>• Data usage and analytics</p>
-                    <p>• Personalized recommendations</p>
-                    <p>• Marketing communications</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <Label className="text-base">Password</Label>
+                      <div className="text-sm text-muted-foreground">
+                        Change your account password
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowPasswordChange(!showPasswordChange)}
+                      data-testid="toggle-password-change"
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Change Password
+                    </Button>
                   </div>
+
+                  {showPasswordChange && (
+                    <Card className="border-2">
+                      <CardContent className="pt-6">
+                        <Form {...passwordForm}>
+                          <form onSubmit={passwordForm.handleSubmit(onChangePassword)} className="space-y-4">
+                            <FormField
+                              control={passwordForm.control}
+                              name="currentPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Current Password</FormLabel>
+                                  <FormControl>
+                                    <Input type="password" {...field} data-testid="current-password" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={passwordForm.control}
+                              name="newPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>New Password</FormLabel>
+                                  <FormControl>
+                                    <Input type="password" {...field} data-testid="new-password" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={passwordForm.control}
+                              name="confirmPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Confirm New Password</FormLabel>
+                                  <FormControl>
+                                    <Input type="password" {...field} data-testid="confirm-password" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex space-x-2">
+                              <Button 
+                                type="submit" 
+                                disabled={changePasswordMutation.isPending}
+                                data-testid="save-password"
+                              >
+                                {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+                              </Button>
+                              <Button 
+                                type="button" 
+                                variant="outline"
+                                onClick={() => setShowPasswordChange(false)}
+                                data-testid="cancel-password"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
 
-                <Separator />
-
-                <div>
-                  <h4 className="font-medium mb-2 text-destructive">Danger Zone</h4>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={handleDeleteAccount}
-                    disabled={deleteAccountMutation.isPending}
-                    data-testid="delete-account"
+            {/* Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Preferences
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Theme</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Choose your preferred interface theme
+                    </div>
+                  </div>
+                  <Select 
+                    value={settings.preferences.theme} 
+                    onValueChange={(value) => updatePreferenceSetting('theme', value)}
                   >
-                    {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
+                    <SelectTrigger className="w-32" data-testid="theme-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">Light</SelectItem>
+                      <SelectItem value="dark">Dark</SelectItem>
+                      <SelectItem value="system">System</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Language</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Select your preferred language
+                    </div>
+                  </div>
+                  <Select 
+                    value={settings.preferences.language} 
+                    onValueChange={(value) => updatePreferenceSetting('language', value)}
+                  >
+                    <SelectTrigger className="w-32" data-testid="language-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="es">Español</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                      <SelectItem value="de">Deutsch</SelectItem>
+                      <SelectItem value="it">Italiano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Data Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Data Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Export Personal Data</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Download a copy of your personal data and account information
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleDataExport}
+                    data-testid="export-data"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Data
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Once you delete your account, there is no going back. Please be certain.
-                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Danger Zone */}
+            <Card className="border-destructive">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <Shield className="h-5 w-5" />
+                  Danger Zone
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Delete Account</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Once you delete your account, there is no going back. Please be certain.
+                      This will permanently delete your account, orders, addresses, and all associated data.
+                    </p>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDeleteAccount}
+                      disabled={deleteAccountMutation.isPending}
+                      data-testid="delete-account"
+                    >
+                      {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
