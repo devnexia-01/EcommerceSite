@@ -28,7 +28,8 @@ export default function Login() {
     defaultValues: {
       email: "",
       password: ""
-    }
+    },
+    mode: "onChange"
   });
 
   // Redirect if already authenticated

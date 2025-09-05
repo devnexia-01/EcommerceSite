@@ -32,7 +32,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: (data: AuthResponse) => {
-      queryClient.setQueryData(["/api/v1/auth/me"], data);
+      // Store the complete user data structure that getMe returns
+      queryClient.setQueryData(["/api/v1/auth/me"], { user: data.user });
+      // Invalidate all queries to refresh with new auth state
+      queryClient.invalidateQueries();
       if (!data.twoFactorRequired) {
         toast({
           title: "Success",
@@ -58,7 +61,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: authApi.register,
     onSuccess: (data: AuthResponse) => {
-      queryClient.setQueryData(["/api/v1/auth/me"], data);
+      // Store the complete user data structure that getMe returns
+      queryClient.setQueryData(["/api/v1/auth/me"], { user: data.user });
+      // Invalidate all queries to refresh with new auth state
+      queryClient.invalidateQueries();
       toast({
         title: "Success",
         description: data.user.emailVerified ? "Account created successfully" : "Account created! Please check your email to verify your account."

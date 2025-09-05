@@ -42,7 +42,8 @@ export default function Register() {
       firstName: "",
       lastName: "",
       phoneNumber: ""
-    }
+    },
+    mode: "onChange"
   });
 
   // Redirect if already authenticated

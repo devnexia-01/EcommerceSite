@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { tokenManager } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -12,9 +13,16 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const accessToken = tokenManager.getAccessToken();
+  
+  const headers: Record<string, string> = {
+    ...(data ? { "Content-Type": "application/json" } : {}),
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+  };
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -50,7 +58,14 @@ export const getQueryFn: <T>(options: {
       url = queryKey.join("/");
     }
 
+    const accessToken = tokenManager.getAccessToken();
+    
+    const headers: Record<string, string> = {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+    };
+
     const res = await fetch(url, {
+      headers,
       credentials: "include",
     });
 
