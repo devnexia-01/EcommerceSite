@@ -48,9 +48,9 @@ export default function Products() {
     }]
   });
 
-  const categories = categoriesData || [];
-  const products = productsData?.products || [];
-  const totalProducts = productsData?.total || 0;
+  const categories = (categoriesData as any[]) || [];
+  const products = (productsData as any)?.products || [];
+  const totalProducts = (productsData as any)?.total || 0;
   const totalPages = Math.ceil(totalProducts / itemsPerPage);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -168,7 +168,7 @@ export default function Products() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground" data-testid="products-title">
                   {searchQuery ? `Search results for "${searchQuery}"` : 
-                   selectedCategory ? categories.find((c: any) => c.id === selectedCategory)?.name || 'Products' : 
+                   selectedCategory ? (categories as any[]).find((c: any) => c.id === selectedCategory)?.name || 'Products' : 
                    'All Products'}
                 </h1>
                 <p className="text-muted-foreground" data-testid="results-count">
@@ -225,7 +225,7 @@ export default function Products() {
                 )}
                 {selectedCategory && (
                   <Badge variant="secondary" className="gap-2" data-testid="active-category-filter">
-                    Category: {categories.find((c: any) => c.id === selectedCategory)?.name}
+                    Category: {(categories as any[]).find((c: any) => c.id === selectedCategory)?.name}
                     <button onClick={() => { setSelectedCategory(""); setCurrentPage(1); }}>×</button>
                   </Badge>
                 )}

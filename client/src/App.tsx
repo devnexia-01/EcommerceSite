@@ -9,6 +9,7 @@ import Header from "./components/layout/header";
 import Footer from "./components/layout/footer";
 import Home from "./pages/home";
 import Products from "./pages/products";
+import Categories from "./pages/categories";
 import ProductDetail from "./pages/product-detail";
 import Cart from "./pages/cart";
 import Checkout from "./pages/checkout";
@@ -23,6 +24,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/products" component={Products} />
+      <Route path="/categories" component={Categories} />
       <Route path="/product/:slug" component={ProductDetail} />
       <Route path="/cart" component={Cart} />
       <Route path="/checkout" component={Checkout} />

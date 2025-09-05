@@ -15,8 +15,8 @@ export default function Home() {
     queryKey: ["/api/products", { limit: 8 }]
   });
 
-  const categories = categoriesData || [];
-  const products = featuredProducts?.products || [];
+  const categories = (categoriesData as any[]) || [];
+  const products = (featuredProducts as any)?.products || [];
 
   const categoryEmojis: Record<string, string> = {
     electronics: "📱",

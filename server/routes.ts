@@ -12,8 +12,8 @@ declare module 'express-session' {
   }
 }
 
-interface AuthRequest extends Request {
-  session: {
+interface AuthenticatedRequest extends Request {
+  session: Express.Session & {
     userId?: string;
   };
 }
