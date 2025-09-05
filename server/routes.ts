@@ -223,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart routes
   app.get("/api/cart", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.session!.userId!;
+      const userId = req.user!.userId;
       const cartItems = await storage.getCartItems(userId);
       res.json(cartItems);
     } catch (error: any) {
@@ -235,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const cartData = insertCartItemSchema.parse({
         ...req.body,
-        userId: req.session!.userId
+        userId: req.user!.userId
       });
       
       const cartItem = await storage.addToCart(cartData);
@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.session!.userId!;
+      const userId = req.user!.userId;
       await storage.clearCart(userId);
       res.json({ message: "Cart cleared" });
     } catch (error: any) {
@@ -277,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Address routes
   app.get("/api/addresses", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.session!.userId!;
+      const userId = req.user!.userId;
       const addresses = await storage.getUserAddresses(userId);
       res.json(addresses);
     } catch (error: any) {
@@ -289,12 +289,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const addressData = insertAddressSchema.parse({
         ...req.body,
-        userId: req.session!.userId
+        userId: req.user!.userId
       });
       
       const address = await storage.createAddress(addressData);
       res.status(201).json(address);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Validation error', 
+          errors: error.errors 
+        });
+      }
       res.status(400).json({ message: error.message });
     }
   });
@@ -321,7 +327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.get("/api/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const orders = await storage.getOrders(req.session!.userId);
+      const orders = await storage.getOrders(req.user!.userId);
       res.json(orders);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -349,13 +355,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           ...orderData,
           orderNumber,
-          userId: req.session!.userId
+          userId: req.user!.userId
         },
         orderItems || []
       );
 
       // Clear cart after successful order
-      const userId = req.session!.userId!;
+      const userId = req.user!.userId;
       await storage.clearCart(userId);
       
       res.status(201).json(order);
