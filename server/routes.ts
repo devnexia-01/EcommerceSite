@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import type { Session } from "express-session";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
@@ -13,7 +14,7 @@ declare module 'express-session' {
 }
 
 interface AuthenticatedRequest extends Request {
-  session: Express.Session & {
+  session: Session & {
     userId?: string;
   };
 }
@@ -98,7 +99,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", requireAuth, async (req: Request, res: Response) => {
     try {
-      const user = await storage.getUser(req.session!.userId);
+      const userId = req.session!.userId!;
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -230,7 +232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart routes
   app.get("/api/cart", requireAuth, async (req: Request, res: Response) => {
     try {
-      const cartItems = await storage.getCartItems(req.session!.userId);
+      const userId = req.session!.userId!;
+      const cartItems = await storage.getCartItems(userId);
       res.json(cartItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -272,7 +275,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart", requireAuth, async (req: Request, res: Response) => {
     try {
-      await storage.clearCart(req.session!.userId);
+      const userId = req.session!.userId!;
+      await storage.clearCart(userId);
       res.json({ message: "Cart cleared" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -282,7 +286,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Address routes
   app.get("/api/addresses", requireAuth, async (req: Request, res: Response) => {
     try {
-      const addresses = await storage.getUserAddresses(req.session!.userId);
+      const userId = req.session!.userId!;
+      const addresses = await storage.getUserAddresses(userId);
       res.json(addresses);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -359,7 +364,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Clear cart after successful order
-      await storage.clearCart(req.session!.userId);
+      const userId = req.session!.userId!;
+      await storage.clearCart(userId);
       
       res.status(201).json(order);
     } catch (error: any) {

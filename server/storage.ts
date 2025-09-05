@@ -169,13 +169,8 @@ export class DatabaseStorage implements IStorage {
       conditions.push(ilike(products.name, `%${search}%`));
     }
 
-    let baseQuery = db.select().from(products);
-    let countBaseQuery = db.select({ count: sql<number>`count(*)` }).from(products);
-
-    if (conditions.length > 0) {
-      baseQuery = baseQuery.where(and(...conditions));
-      countBaseQuery = countBaseQuery.where(and(...conditions));
-    }
+    // Build where clause
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
 
     // Apply sorting
     const sortColumn = {
@@ -185,14 +180,14 @@ export class DatabaseStorage implements IStorage {
       created: products.createdAt
     }[sortBy];
 
-    const finalQuery = baseQuery
-      .orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
-      .limit(limit)
-      .offset(offset);
-
     const [productsResult, countResult] = await Promise.all([
-      finalQuery,
-      countBaseQuery
+      db.select().from(products)
+        .where(whereClause)
+        .orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(products)
+        .where(whereClause)
     ]);
 
     return {
@@ -212,15 +207,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
-    const [newProduct] = await db.insert(products).values(product).returning();
+    const [newProduct] = await db.insert(products).values(product as any).returning();
     return newProduct;
   }
 
   async updateProduct(id: string, productUpdate: Partial<InsertProduct>): Promise<Product> {
-    const updateData = { ...productUpdate };
+    const updateData = {
+      ...productUpdate,
+      updatedAt: sql`now()`
+    };
     const [product] = await db
       .update(products)
-      .set({ ...updateData, updatedAt: sql`now()` })
+      .set(updateData as any)
       .where(eq(products.id, id))
       .returning();
     return product;
