@@ -1,0 +1,626 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { User, MapPin, Package, Settings, Heart, CreditCard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Link } from "wouter";
+
+const profileSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().optional()
+});
+
+const addressSchema = z.object({
+  type: z.enum(["shipping", "billing"]),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  streetAddress: z.string().min(1, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  zipCode: z.string().min(1, "ZIP code is required"),
+  country: z.string().default("US"),
+  isDefault: z.boolean().default(false)
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
+type AddressFormData = z.infer<typeof addressSchema>;
+
+export default function Profile() {
+  const [activeTab, setActiveTab] = useState("profile");
+  const [editingAddress, setEditingAddress] = useState<string | null>(null);
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const profileForm = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      email: user?.email || "",
+      phone: user?.phone || ""
+    }
+  });
+
+  const addressForm = useForm<AddressFormData>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: {
+      type: "shipping",
+      country: "US",
+      isDefault: false
+    }
+  });
+
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ["/api/orders"],
+    enabled: isAuthenticated
+  });
+
+  const { data: addresses = [], isLoading: addressesLoading } = useQuery({
+    queryKey: ["/api/addresses"],
+    enabled: isAuthenticated
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: ProfileFormData) => apiRequest("PUT", `/api/users/${user?.id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Success",
+        description: "Profile updated successfully"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const createAddressMutation = useMutation({
+    mutationFn: (data: AddressFormData) => apiRequest("POST", "/api/addresses", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/addresses"] });
+      addressForm.reset();
+      setEditingAddress(null);
+      toast({
+        title: "Success",
+        description: "Address saved successfully"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save address",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const deleteAddressMutation = useMutation({
+    mutationFn: (addressId: string) => apiRequest("DELETE", `/api/addresses/${addressId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/addresses"] });
+      toast({
+        title: "Success",
+        description: "Address deleted successfully"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete address",
+        variant: "destructive"
+      });
+    }
+  });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Please Login</h2>
+            <p className="text-muted-foreground mb-4">
+              You need to be logged in to access your profile
+            </p>
+            <Button asChild>
+              <Link href="/login">Login</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const onUpdateProfile = async (data: ProfileFormData) => {
+    await updateProfileMutation.mutateAsync(data);
+  };
+
+  const onSaveAddress = async (data: AddressFormData) => {
+    await createAddressMutation.mutateAsync(data);
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    if (confirm("Are you sure you want to delete this address?")) {
+      await deleteAddressMutation.mutateAsync(addressId);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "delivered":
+        return "bg-accent text-accent-foreground";
+      case "shipped":
+        return "bg-primary text-primary-foreground";
+      case "processing":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
+      case "cancelled":
+        return "bg-destructive text-destructive-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="profile-page">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Profile Header */}
+        <div className="bg-gradient-to-r from-primary to-accent p-6 text-primary-foreground rounded-lg mb-8">
+          <div className="flex items-center space-x-4">
+            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
+              <User className="h-10 w-10" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" data-testid="profile-name">
+                {user?.firstName || user?.username} {user?.lastName || ""}
+              </h1>
+              <p className="text-primary-foreground/80" data-testid="profile-email">
+                {user?.email}
+              </p>
+              <p className="text-sm text-primary-foreground/60">
+                Member since {new Date().getFullYear()}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="profile" className="flex items-center gap-2" data-testid="tab-profile">
+              <User className="h-4 w-4" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="orders" className="flex items-center gap-2" data-testid="tab-orders">
+              <Package className="h-4 w-4" />
+              Orders
+            </TabsTrigger>
+            <TabsTrigger value="addresses" className="flex items-center gap-2" data-testid="tab-addresses">
+              <MapPin className="h-4 w-4" />
+              Addresses
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2" data-testid="tab-settings">
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Personal Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...profileForm}>
+                  <form onSubmit={profileForm.handleSubmit(onUpdateProfile)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={profileForm.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="profile-first-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={profileForm.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="profile-last-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={profileForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} data-testid="profile-email-input" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={profileForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="profile-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button 
+                      type="submit" 
+                      disabled={updateProfileMutation.isPending}
+                      data-testid="save-profile"
+                    >
+                      {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Orders Tab */}
+          <TabsContent value="orders" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {ordersLoading ? (
+                  <div className="text-center py-8">
+                    <LoadingSpinner className="mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading orders...</p>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      You haven't placed any orders yet
+                    </p>
+                    <Button asChild>
+                      <Link href="/products">Start Shopping</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order: any) => (
+                      <div key={order.id} className="border border-border rounded-lg p-4" data-testid={`order-${order.id}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium">#{order.orderNumber}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">${parseFloat(order.total).toFixed(2)}</p>
+                            <Badge className={getStatusColor(order.status)}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {order.orderItems && order.orderItems.length > 0 && (
+                          <div className="flex items-center space-x-4">
+                            <img
+                              src={order.orderItems[0].product?.imageUrl || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&h=60"}
+                              alt="Order item"
+                              className="w-12 h-12 object-cover rounded"
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm">
+                                {order.orderItems[0].product?.name}
+                                {order.orderItems.length > 1 && ` and ${order.orderItems.length - 1} other item(s)`}
+                              </p>
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button variant="outline" size="sm" data-testid={`view-order-${order.id}`}>
+                                View Details
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Addresses Tab */}
+          <TabsContent value="addresses" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  Saved Addresses
+                  <Button 
+                    onClick={() => setEditingAddress("new")}
+                    data-testid="add-address"
+                  >
+                    Add Address
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {addressesLoading ? (
+                  <div className="text-center py-8">
+                    <LoadingSpinner className="mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading addresses...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {addresses.map((address: any) => (
+                      <div key={address.id} className="border border-border rounded-lg p-4" data-testid={`address-${address.id}`}>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline">
+                                {address.type.charAt(0).toUpperCase() + address.type.slice(1)}
+                              </Badge>
+                              {address.isDefault && (
+                                <Badge className="bg-accent text-accent-foreground">Default</Badge>
+                              )}
+                            </div>
+                            <p className="font-medium">
+                              {address.firstName} {address.lastName}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {address.streetAddress}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {address.city}, {address.state} {address.zipCode}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {address.country}
+                            </p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setEditingAddress(address.id)}
+                              data-testid={`edit-address-${address.id}`}
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDeleteAddress(address.id)}
+                              data-testid={`delete-address-${address.id}`}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {addresses.length === 0 && (
+                      <div className="text-center py-8">
+                        <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold mb-2">No addresses saved</h3>
+                        <p className="text-muted-foreground mb-4">
+                          Add an address for faster checkout
+                        </p>
+                        <Button onClick={() => setEditingAddress("new")}>
+                          Add Your First Address
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Address Form */}
+                    {editingAddress && (
+                      <Card className="mt-6">
+                        <CardHeader>
+                          <CardTitle>
+                            {editingAddress === "new" ? "Add New Address" : "Edit Address"}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Form {...addressForm}>
+                            <form onSubmit={addressForm.handleSubmit(onSaveAddress)} className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                  control={addressForm.control}
+                                  name="firstName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>First Name</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} data-testid="address-first-name" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={addressForm.control}
+                                  name="lastName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Last Name</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} data-testid="address-last-name" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
+                              <FormField
+                                control={addressForm.control}
+                                name="streetAddress"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Street Address</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} data-testid="address-street" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FormField
+                                  control={addressForm.control}
+                                  name="city"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>City</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} data-testid="address-city" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={addressForm.control}
+                                  name="state"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>State</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} data-testid="address-state" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={addressForm.control}
+                                  name="zipCode"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>ZIP Code</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} data-testid="address-zip" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
+                              <div className="flex space-x-4">
+                                <Button 
+                                  type="submit" 
+                                  disabled={createAddressMutation.isPending}
+                                  data-testid="save-address"
+                                >
+                                  {createAddressMutation.isPending ? "Saving..." : "Save Address"}
+                                </Button>
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  onClick={() => setEditingAddress(null)}
+                                  data-testid="cancel-address"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </form>
+                          </Form>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h4 className="font-medium mb-2">Notification Preferences</h4>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>• Order confirmations and updates</p>
+                    <p>• Promotional emails and offers</p>
+                    <p>• Product recommendations</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium mb-2">Privacy</h4>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>• Data usage and analytics</p>
+                    <p>• Personalized recommendations</p>
+                    <p>• Marketing communications</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium mb-2 text-destructive">Danger Zone</h4>
+                  <Button variant="destructive" size="sm">
+                    Delete Account
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Once you delete your account, there is no going back. Please be certain.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
