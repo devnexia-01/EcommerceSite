@@ -150,6 +150,26 @@ export default function Profile() {
     }
   });
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/v1/users/${user?.id}`),
+    onSuccess: () => {
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been permanently deleted"
+      });
+      // Clear all data and redirect to home
+      queryClient.clear();
+      window.location.href = "/";
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete account",
+        variant: "destructive"
+      });
+    }
+  });
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -197,26 +217,6 @@ export default function Profile() {
       isDefault: address.isDefault || false
     });
   };
-
-  const deleteAccountMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", `/api/v1/users/${user?.id}`),
-    onSuccess: () => {
-      toast({
-        title: "Account Deleted",
-        description: "Your account has been permanently deleted"
-      });
-      // Clear all data and redirect to home
-      queryClient.clear();
-      window.location.href = "/";
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete account",
-        variant: "destructive"
-      });
-    }
-  });
 
   const handleDeleteAccount = () => {
     const confirmation = confirm(
