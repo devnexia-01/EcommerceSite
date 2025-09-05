@@ -198,6 +198,53 @@ export default function Profile() {
     });
   };
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/v1/users/${user?.id}`),
+    onSuccess: () => {
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been permanently deleted"
+      });
+      // Clear all data and redirect to home
+      queryClient.clear();
+      window.location.href = "/";
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete account",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDeleteAccount = () => {
+    const confirmation = confirm(
+      "Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost."
+    );
+    
+    if (confirmation) {
+      const finalConfirmation = confirm(
+        "This is your final warning. Your account, orders, addresses, and all associated data will be permanently deleted. Type 'DELETE' in the next prompt to confirm."
+      );
+      
+      if (finalConfirmation) {
+        const typedConfirmation = prompt(
+          "Please type 'DELETE' in capital letters to confirm account deletion:"
+        );
+        
+        if (typedConfirmation === "DELETE") {
+          deleteAccountMutation.mutate();
+        } else {
+          toast({
+            title: "Cancelled",
+            description: "Account deletion cancelled - confirmation text did not match"
+          });
+        }
+      }
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "delivered":
@@ -642,8 +689,14 @@ export default function Profile() {
 
                 <div>
                   <h4 className="font-medium mb-2 text-destructive">Danger Zone</h4>
-                  <Button variant="destructive" size="sm">
-                    Delete Account
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={handleDeleteAccount}
+                    disabled={deleteAccountMutation.isPending}
+                    data-testid="delete-account"
+                  >
+                    {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
                   </Button>
                   <p className="text-xs text-muted-foreground mt-2">
                     Once you delete your account, there is no going back. Please be certain.
