@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
+import { NotificationTest } from "@/components/NotificationTest";
 
 const profileSchema = z.object({
   firstName: z.string().optional(),
@@ -850,6 +851,14 @@ export default function Profile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg mb-4">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Test Email Notifications</h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                    Want to see how your email notifications will look? Send yourself a test email!
+                  </p>
+                  <NotificationTest />
+                </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-base">Order Updates</Label>

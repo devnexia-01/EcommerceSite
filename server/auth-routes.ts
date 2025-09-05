@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { storage } from './storage';
 import { AuthUtils } from './auth-utils';
+import { emailNotificationService } from './email-service';
 import { 
   registerSchema, 
   loginSchema, 
@@ -243,6 +244,17 @@ export function setupAuthRoutes(app: Express) {
       
       // Update last login
       await storage.updateUser(user.id, { lastLoginAt: new Date() } as any);
+      
+      // Send security alert for successful login (optional, based on user preferences)
+      try {
+        await emailNotificationService.notifySecurityAlert(
+          user.id,
+          `Successful login from ${req.ip || 'unknown IP'} at ${new Date().toLocaleString()}`
+        );
+      } catch (emailError) {
+        console.error('Failed to send login security alert:', emailError);
+        // Don't fail login if email fails
+      }
       
       // Generate tokens
       const accessToken = AuthUtils.generateAccessToken({

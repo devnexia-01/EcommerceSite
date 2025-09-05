@@ -7,6 +7,8 @@ import { insertUserSchema, insertProductSchema, insertCategorySchema, insertAddr
 import { z } from "zod";
 import { setupAuthRoutes, authenticateToken, requireAdmin } from "./auth-routes";
 import { setupUserRoutes } from "./user-routes";
+import { emailNotificationService } from "./email-service";
+import { setupNotificationRoutes } from "./notification-routes";
 
 // Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {
@@ -39,6 +41,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup user profile management routes
   setupUserRoutes(app);
+  
+  // Setup notification routes
+  setupNotificationRoutes(app);
 
   // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {
@@ -364,6 +369,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.userId;
       await storage.clearCart(userId);
       
+      // Send order confirmation email
+      try {
+        await emailNotificationService.notifyOrderConfirmed(
+          userId,
+          order.orderNumber,
+          orderItems || [],
+          orderData.total || 0
+        );
+      } catch (emailError) {
+        console.error('Failed to send order confirmation email:', emailError);
+        // Don't fail the order creation if email fails
+      }
+      
       res.status(201).json(order);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -372,8 +390,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/orders/:id/status", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { status } = req.body;
+      const { status, trackingNumber } = req.body;
       const order = await storage.updateOrderStatus(req.params.id, status);
+      
+      // Send shipping notification if order status is shipped
+      if (status === 'shipped' && order.userId && trackingNumber) {
+        try {
+          await emailNotificationService.notifyOrderShipped(
+            order.userId,
+            order.orderNumber,
+            trackingNumber
+          );
+        } catch (emailError) {
+          console.error('Failed to send shipping notification email:', emailError);
+          // Don't fail the status update if email fails
+        }
+      }
+      
       res.json(order);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

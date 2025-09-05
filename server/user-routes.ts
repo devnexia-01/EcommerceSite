@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { z } from 'zod';
 import { storage } from './storage';
 import { authenticateToken, requireAdmin } from './auth-routes';
+import { emailNotificationService } from './email-service';
 import { changePasswordSchema } from '@shared/schema';
 import bcrypt from 'bcrypt';
 
@@ -508,6 +509,16 @@ export function setupUserRoutes(app: Express) {
         await storage.updateUser(userId, { 
           twoFactorEnabled: updateData.security.twoFactorEnabled 
         });
+        
+        // Send security alert for 2FA changes
+        try {
+          const action = updateData.security.twoFactorEnabled 
+            ? 'Two-factor authentication enabled' 
+            : 'Two-factor authentication disabled';
+          await emailNotificationService.notifySecurityAlert(userId, action);
+        } catch (emailError) {
+          console.error('Failed to send security alert email:', emailError);
+        }
       }
       
       res.json({
@@ -543,6 +554,13 @@ export function setupUserRoutes(app: Express) {
       
       if (!success) {
         return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+      
+      // Send security alert for password change
+      try {
+        await emailNotificationService.notifySecurityAlert(userId, 'Password changed successfully');
+      } catch (emailError) {
+        console.error('Failed to send security alert email:', emailError);
       }
       
       res.json({
