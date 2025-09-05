@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -50,10 +50,10 @@ export default function Profile() {
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
-      email: user?.email || "",
-      phone: user?.phone || ""
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: ""
     }
   });
 
@@ -61,25 +61,43 @@ export default function Profile() {
     resolver: zodResolver(addressSchema),
     defaultValues: {
       type: "shipping",
+      firstName: "",
+      lastName: "",
+      streetAddress: "",
+      city: "",
+      state: "",
+      zipCode: "",
       country: "US",
       isDefault: false
     }
   });
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+  // Update form values when user data loads
+  useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        phone: user.phoneNumber || ""
+      });
+    }
+  }, [user, profileForm]);
+
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<any[]>({
     queryKey: ["/api/orders"],
     enabled: isAuthenticated
   });
 
-  const { data: addresses = [], isLoading: addressesLoading } = useQuery({
+  const { data: addresses = [], isLoading: addressesLoading } = useQuery<any[]>({
     queryKey: ["/api/addresses"],
     enabled: isAuthenticated
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: (data: ProfileFormData) => apiRequest("PUT", `/api/users/${user?.id}`, data),
+    mutationFn: (data: ProfileFormData) => apiRequest("PUT", `/api/v1/users/${user?.id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
       toast({
         title: "Success",
         description: "Profile updated successfully"
@@ -163,6 +181,21 @@ export default function Profile() {
     if (confirm("Are you sure you want to delete this address?")) {
       await deleteAddressMutation.mutateAsync(addressId);
     }
+  };
+
+  const handleEditAddress = (address: any) => {
+    setEditingAddress(address.id);
+    addressForm.reset({
+      type: address.type || "shipping",
+      firstName: address.firstName || "",
+      lastName: address.lastName || "",
+      streetAddress: address.streetAddress || "",
+      city: address.city || "",
+      state: address.state || "",
+      zipCode: address.zipCode || "",
+      country: address.country || "US",
+      isDefault: address.isDefault || false
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -423,7 +456,7 @@ export default function Profile() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => setEditingAddress(address.id)}
+                              onClick={() => handleEditAddress(address)}
                               data-testid={`edit-address-${address.id}`}
                             >
                               Edit
