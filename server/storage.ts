@@ -1266,7 +1266,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCategoryV1(categoryData: any): Promise<any> {
-    const [newCategory] = await db.insert(categories).values({
+    const insertData = {
       name: categoryData.name,
       slug: categoryData.slug,
       description: categoryData.description,
@@ -1276,16 +1276,22 @@ export class DatabaseStorage implements IStorage {
       status: categoryData.status || "active",
       sortOrder: categoryData.sortOrder || 0,
       seo: categoryData.seo || {}
-    } as any).returning();
+    };
+    const [newCategory] = await db.insert(categories).values(insertData as any).returning();
 
     return newCategory;
   }
 
   async updateCategoryV1(categoryId: string, categoryData: any): Promise<any> {
-    const updateData = {
-      ...categoryData,
+    const updateData: any = {
       updatedAt: sql`now()`
     };
+    
+    if (categoryData.name) updateData.name = categoryData.name;
+    if (categoryData.description) updateData.description = categoryData.description;
+    if (categoryData.status) updateData.status = categoryData.status;
+    if (categoryData.sortOrder !== undefined) updateData.sortOrder = categoryData.sortOrder;
+    if (categoryData.seo) updateData.seo = categoryData.seo;
 
     const [updatedCategory] = await db
       .update(categories)
@@ -1306,7 +1312,12 @@ export class DatabaseStorage implements IStorage {
     sortBy?: string;
     sortOrder?: string;
   }): Promise<{ products: any[]; total: number }> {
-    return this.getProductsV1({ ...params, categoryId });
+    return this.getProductsV1({ 
+      ...params, 
+      categoryId,
+      sortBy: params.sortBy as any,
+      sortOrder: params.sortOrder as any
+    });
   }
 }
 
