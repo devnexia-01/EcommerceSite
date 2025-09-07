@@ -370,47 +370,499 @@ export const cartItems = pgTable("cart_items", {
   createdAt: timestamp("created_at").default(sql`now()`)
 });
 
-// Orders table
+// Enhanced Orders table with comprehensive order management
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull().unique(),
   userId: uuid("user_id").references(() => users.id).notNull(),
-  status: text("status").default("pending"), // pending, processing, shipped, delivered, cancelled
+  
+  // Order status and type
+  status: text("status").default("pending"), // pending|confirmed|processing|shipped|delivered|cancelled|returned|refunded
+  type: text("type").default("standard"), // standard|express|priority|subscription
+  channel: text("channel").default("web"), // web|mobile|api|phone|store
+  currency: text("currency").default("USD"),
+  
+  // Pricing breakdown
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   shipping: decimal("shipping", { precision: 10, scale: 2 }).default("0"),
   tax: decimal("tax", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  shippingAddress: jsonb("shipping_address").$type<{
+  
+  // Tax breakdown
+  taxBreakdown: jsonb("tax_breakdown").$type<Array<{
+    type: string;
+    rate: string;
+    amount: string;
+  }>>(),
+  
+  // Shipping details
+  shippingMethod: text("shipping_method"),
+  shippingCarrier: text("shipping_carrier"),
+  estimatedDeliveryDays: integer("estimated_delivery_days"),
+  
+  // Addresses
+  billingAddress: jsonb("billing_address").$type<{
     firstName: string;
     lastName: string;
+    company?: string;
     streetAddress: string;
+    streetAddress2?: string;
     city: string;
     state: string;
     zipCode: string;
     country: string;
+    phone?: string;
   }>().notNull(),
-  createdAt: timestamp("created_at").default(sql`now()`)
+  
+  shippingAddress: jsonb("shipping_address").$type<{
+    firstName: string;
+    lastName: string;
+    company?: string;
+    streetAddress: string;
+    streetAddress2?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    phone?: string;
+    instructions?: string;
+  }>().notNull(),
+  
+  // Payment information
+  paymentMethod: text("payment_method"), // credit_card|debit_card|paypal|apple_pay|google_pay|bank_transfer|cash_on_delivery
+  paymentStatus: text("payment_status").default("pending"), // pending|authorized|captured|failed|refunded|partially_refunded
+  paymentTransactionId: text("payment_transaction_id"),
+  paymentGateway: text("payment_gateway"),
+  paymentLast4: text("payment_last4"),
+  paymentCardType: text("payment_card_type"),
+  paymentAuthCode: text("payment_auth_code"),
+  capturedAmount: decimal("captured_amount", { precision: 10, scale: 2 }),
+  refundedAmount: decimal("refunded_amount", { precision: 10, scale: 2 }).default("0"),
+  
+  // Fulfillment
+  warehouseId: uuid("warehouse_id"),
+  trackingNumber: text("tracking_number"),
+  trackingCarrier: text("tracking_carrier"),
+  trackingService: text("tracking_service"),
+  estimatedDelivery: timestamp("estimated_delivery"),
+  actualDelivery: timestamp("actual_delivery"),
+  deliverySignature: text("delivery_signature"),
+  specialInstructions: text("special_instructions"),
+  
+  // Discounts
+  discounts: jsonb("discounts").$type<Array<{
+    discountId: string;
+    code: string;
+    type: string;
+    amount: string;
+    description: string;
+  }>>(),
+  
+  // Metadata and timeline
+  priority: text("priority").default("normal"), // low|normal|high|urgent
+  riskScore: decimal("risk_score", { precision: 3, scale: 2 }),
+  fraudCheckStatus: text("fraud_check_status").default("pending"), // pending|passed|flagged|failed
+  fraudCheckScore: decimal("fraud_check_score", { precision: 3, scale: 2 }),
+  fraudCheckReasons: jsonb("fraud_check_reasons").$type<string[]>(),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  confirmedAt: timestamp("confirmed_at"),
+  shippedAt: timestamp("shipped_at"),
+  deliveredAt: timestamp("delivered_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  
+  // Additional fields
+  source: text("source"), // Source that created the order
+  notes: text("notes"),
+  tags: jsonb("tags").$type<string[]>()
 });
 
-// Order items table
+// Enhanced Order items table
 export const orderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
   productId: uuid("product_id").references(() => products.id).notNull(),
+  variantId: uuid("variant_id"), // For product variants
+  sku: text("sku").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
   quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  weight: decimal("weight", { precision: 8, scale: 3 }),
+  
+  // Item dimensions
+  dimensions: jsonb("dimensions").$type<{
+    length: number;
+    width: number;
+    height: number;
+  }>(),
+  
+  // Customization options
+  customization: jsonb("customization").$type<{
+    options: Record<string, any>;
+    instructions?: string;
+  }>(),
+  
+  // Item status
+  status: text("status").default("pending"), // pending|confirmed|cancelled|returned
+  
+  // Legacy compatibility
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull()
 });
 
-// Reviews table
+// Returns table
+export const returns = pgTable("returns", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  returnNumber: text("return_number").notNull().unique(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  status: text("status").default("requested"), // requested|approved|rejected|received|processing|completed|cancelled
+  type: text("type").default("return"), // return|exchange|refund
+  reason: text("reason"), // defective|wrong_item|damaged|not_as_described|changed_mind|size_issue|quality_issue|other
+  
+  // Refund details
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }),
+  refundMethod: text("refund_method"), // original_payment|store_credit|bank_transfer|check
+  refundStatus: text("refund_status").default("pending"), // pending|processed|failed|cancelled
+  refundTransactionId: text("refund_transaction_id"),
+  refundProcessedAt: timestamp("refund_processed_at"),
+  
+  // Fees
+  restockingFee: decimal("restocking_fee", { precision: 10, scale: 2 }).default("0"),
+  shippingFee: decimal("shipping_fee", { precision: 10, scale: 2 }).default("0"),
+  processingFee: decimal("processing_fee", { precision: 10, scale: 2 }).default("0"),
+  
+  // Shipping info
+  returnTrackingNumber: text("return_tracking_number"),
+  returnCarrier: text("return_carrier"),
+  returnShippingLabel: text("return_shipping_label"),
+  returnShippingCost: decimal("return_shipping_cost", { precision: 10, scale: 2 }),
+  shippingPaidBy: text("shipping_paid_by"), // customer|merchant
+  
+  // Customer notes and photos
+  customerNotes: text("customer_notes"),
+  internalNotes: text("internal_notes"),
+  photos: jsonb("photos").$type<string[]>(),
+  attachments: jsonb("attachments").$type<string[]>(),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  requestedAt: timestamp("requested_at").default(sql`now()`),
+  approvedAt: timestamp("approved_at"),
+  receivedAt: timestamp("received_at"),
+  completedAt: timestamp("completed_at")
+});
+
+// Return items table
+export const returnItems = pgTable("return_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  returnId: uuid("return_id").references(() => returns.id, { onDelete: "cascade" }).notNull(),
+  orderItemId: uuid("order_item_id").references(() => orderItems.id).notNull(),
+  productId: uuid("product_id").references(() => products.id).notNull(),
+  sku: text("sku").notNull(),
+  name: text("name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).notNull(),
+  condition: text("condition"), // new|used|damaged|defective
+  photos: jsonb("photos").$type<string[]>(),
+  notes: text("notes")
+});
+
+// Invoices table
+export const invoices = pgTable("invoices", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  status: text("status").default("draft"), // draft|sent|paid|overdue|cancelled|void
+  type: text("type").default("invoice"), // invoice|credit_note|proforma
+  currency: text("currency").default("USD"),
+  
+  // Customer info
+  customerInfo: jsonb("customer_info").$type<{
+    name: string;
+    email: string;
+    phone?: string;
+    address: {
+      streetAddress: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
+    taxId?: string;
+    vatNumber?: string;
+  }>().notNull(),
+  
+  // Merchant info
+  merchantInfo: jsonb("merchant_info").$type<{
+    name: string;
+    address: {
+      streetAddress: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
+    taxId?: string;
+    vatNumber?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+  }>().notNull(),
+  
+  // Summary
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  discountTotal: decimal("discount_total", { precision: 10, scale: 2 }).default("0"),
+  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0"),
+  shippingTotal: decimal("shipping_total", { precision: 10, scale: 2 }).default("0"),
+  grandTotal: decimal("grand_total", { precision: 10, scale: 2 }).notNull(),
+  
+  // Payment
+  paymentTerms: text("payment_terms"),
+  dueDate: date("due_date"),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }),
+  paidAt: timestamp("paid_at"),
+  
+  // Metadata
+  notes: text("notes"),
+  terms: text("terms"),
+  template: text("template"),
+  language: text("language").default("en"),
+  pdfUrl: text("pdf_url"),
+  
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  issuedAt: timestamp("issued_at"),
+  sentAt: timestamp("sent_at")
+});
+
+// Invoice line items table
+export const invoiceLineItems = pgTable("invoice_line_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: uuid("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  productId: uuid("product_id").references(() => products.id),
+  sku: text("sku"),
+  description: text("description").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).default("0"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull()
+});
+
+// Tracking table
+export const tracking = pgTable("tracking", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  trackingNumber: text("tracking_number").notNull().unique(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
+  carrier: text("carrier").notNull(),
+  service: text("service"),
+  status: text("status").default("label_created"), // label_created|picked_up|in_transit|out_for_delivery|delivered|exception|returned|cancelled
+  
+  // Origin and destination
+  origin: jsonb("origin").$type<{
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  }>(),
+  
+  destination: jsonb("destination").$type<{
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  }>(),
+  
+  // Package details
+  packageDetails: jsonb("package_details").$type<{
+    weight: number;
+    dimensions: {
+      length: number;
+      width: number;
+      height: number;
+    };
+    value: number;
+    description: string;
+  }>(),
+  
+  // Delivery details
+  estimatedDeliveryDate: timestamp("estimated_delivery_date"),
+  actualDeliveryDate: timestamp("actual_delivery_date"),
+  signedBy: text("signed_by"),
+  deliveryNote: text("delivery_note"),
+  deliveryPhotoUrl: text("delivery_photo_url"),
+  attemptCount: integer("attempt_count").default(0),
+  lastAttempt: timestamp("last_attempt"),
+  
+  // Metadata
+  webhookUrl: text("webhook_url"),
+  externalTrackingUrl: text("external_tracking_url"),
+  lastChecked: timestamp("last_checked"),
+  
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Tracking events table
+export const trackingEvents = pgTable("tracking_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  trackingId: uuid("tracking_id").references(() => tracking.id, { onDelete: "cascade" }).notNull(),
+  status: text("status").notNull(),
+  description: text("description").notNull(),
+  
+  // Location details
+  location: jsonb("location").$type<{
+    city?: string;
+    state?: string;
+    country?: string;
+    facility?: string;
+  }>(),
+  
+  timestamp: timestamp("timestamp").notNull(),
+  details: text("details"),
+  
+  createdAt: timestamp("created_at").default(sql`now()`)
+});
+
+// Order status history table
+export const orderStatusHistory = pgTable("order_status_history", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  reason: text("reason"),
+  notes: text("notes"),
+  
+  // Actor information
+  triggeredById: uuid("triggered_by_id"),
+  triggeredByType: text("triggered_by_type"), // user|admin|system|webhook
+  triggeredByName: text("triggered_by_name"),
+  
+  // Automation details
+  isAutomated: boolean("is_automated").default(false),
+  ruleId: uuid("rule_id"),
+  ruleName: text("rule_name"),
+  
+  // Notifications
+  customerNotified: boolean("customer_notified").default(false),
+  merchantNotified: boolean("merchant_notified").default(false),
+  notificationMethods: jsonb("notification_methods").$type<string[]>(),
+  
+  // Metadata
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  source: text("source"),
+  
+  timestamp: timestamp("timestamp").default(sql`now()`)
+});
+
+// Shipments table
+export const shipments = pgTable("shipments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentNumber: text("shipment_number").notNull().unique(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
+  status: text("status").default("created"), // created|picked|packed|shipped|in_transit|delivered|exception|returned
+  type: text("type").default("standard"), // standard|expedited|overnight|international
+  
+  // Packaging details
+  packagingType: text("packaging_type"), // envelope|box|tube|pallet
+  packagingWeight: decimal("packaging_weight", { precision: 8, scale: 3 }),
+  packagingDimensions: jsonb("packaging_dimensions").$type<{
+    length: number;
+    width: number;
+    height: number;
+  }>(),
+  packagingMaterials: jsonb("packaging_materials").$type<string[]>(),
+  
+  // Carrier details
+  carrierName: text("carrier_name"),
+  carrierService: text("carrier_service"),
+  carrierAccount: text("carrier_account"),
+  trackingNumber: text("tracking_number"),
+  labelUrl: text("label_url"),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }),
+  
+  // Warehouse details
+  warehouseId: uuid("warehouse_id"),
+  warehouseName: text("warehouse_name"),
+  warehouseAddress: text("warehouse_address"),
+  
+  // Processing details
+  packedBy: uuid("packed_by"),
+  specialInstructions: text("special_instructions"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  packedAt: timestamp("packed_at"),
+  shippedAt: timestamp("shipped_at"),
+  deliveredAt: timestamp("delivered_at")
+});
+
+// Shipment items table
+export const shipmentItems = pgTable("shipment_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentId: uuid("shipment_id").references(() => shipments.id, { onDelete: "cascade" }).notNull(),
+  orderItemId: uuid("order_item_id").references(() => orderItems.id).notNull(),
+  productId: uuid("product_id").references(() => products.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  weight: decimal("weight", { precision: 8, scale: 3 })
+});
+
+// Enhanced Reviews table
 export const reviews = pgTable("reviews", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  orderId: uuid("order_id").references(() => orders.id),
+  orderItemId: uuid("order_item_id").references(() => orderItems.id),
   productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   rating: integer("rating").notNull(),
   title: text("title"),
-  comment: text("comment"),
-  createdAt: timestamp("created_at").default(sql`now()`)
+  content: text("content"),
+  photos: jsonb("photos").$type<string[]>(),
+  videos: jsonb("videos").$type<string[]>(),
+  verified: boolean("verified").default(false),
+  
+  // Helpful votes
+  upvotes: integer("upvotes").default(0),
+  downvotes: integer("downvotes").default(0),
+  
+  // Moderation
+  moderationStatus: text("moderation_status").default("pending"), // pending|approved|rejected|flagged
+  moderatedBy: uuid("moderated_by"),
+  moderatedAt: timestamp("moderated_at"),
+  moderationReason: text("moderation_reason"),
+  
+  // Merchant response
+  merchantReply: text("merchant_reply"),
+  repliedAt: timestamp("replied_at"),
+  repliedBy: uuid("replied_by"),
+  
+  // Metadata
+  source: text("source").default("web"), // web|mobile|email|sms
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  language: text("language").default("en"),
+  
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  
+  // Legacy compatibility
+  comment: text("comment")
 });
 
 // Wishlists table
@@ -442,6 +894,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   cartItems: many(cartItems),
   carts: many(carts),
   orders: many(orders),
+  returns: many(returns),
+  invoices: many(invoices),
   reviews: many(reviews),
   wishlists: many(wishlists),
   refreshTokens: many(refreshTokens),
@@ -582,15 +1036,21 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
   })
 }));
 
+// Enhanced order relations
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   user: one(users, {
     fields: [orders.userId],
     references: [users.id]
   }),
-  orderItems: many(orderItems)
+  orderItems: many(orderItems),
+  returns: many(returns),
+  invoices: many(invoices),
+  tracking: many(tracking),
+  statusHistory: many(orderStatusHistory),
+  shipments: many(shipments)
 }));
 
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
   order: one(orders, {
     fields: [orderItems.orderId],
     references: [orders.id]
@@ -598,9 +1058,113 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   product: one(products, {
     fields: [orderItems.productId],
     references: [products.id]
+  }),
+  returnItems: many(returnItems),
+  shipmentItems: many(shipmentItems),
+  reviews: many(reviews)
+}));
+
+// Returns relations
+export const returnsRelations = relations(returns, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [returns.orderId],
+    references: [orders.id]
+  }),
+  user: one(users, {
+    fields: [returns.userId],
+    references: [users.id]
+  }),
+  returnItems: many(returnItems)
+}));
+
+export const returnItemsRelations = relations(returnItems, ({ one }) => ({
+  return: one(returns, {
+    fields: [returnItems.returnId],
+    references: [returns.id]
+  }),
+  orderItem: one(orderItems, {
+    fields: [returnItems.orderItemId],
+    references: [orderItems.id]
+  }),
+  product: one(products, {
+    fields: [returnItems.productId],
+    references: [products.id]
   })
 }));
 
+// Invoice relations
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [invoices.orderId],
+    references: [orders.id]
+  }),
+  user: one(users, {
+    fields: [invoices.userId],
+    references: [users.id]
+  }),
+  lineItems: many(invoiceLineItems)
+}));
+
+export const invoiceLineItemsRelations = relations(invoiceLineItems, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [invoiceLineItems.invoiceId],
+    references: [invoices.id]
+  }),
+  product: one(products, {
+    fields: [invoiceLineItems.productId],
+    references: [products.id]
+  })
+}));
+
+// Tracking relations
+export const trackingRelations = relations(tracking, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [tracking.orderId],
+    references: [orders.id]
+  }),
+  events: many(trackingEvents)
+}));
+
+export const trackingEventsRelations = relations(trackingEvents, ({ one }) => ({
+  tracking: one(tracking, {
+    fields: [trackingEvents.trackingId],
+    references: [tracking.id]
+  })
+}));
+
+// Order status history relations
+export const orderStatusHistoryRelations = relations(orderStatusHistory, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderStatusHistory.orderId],
+    references: [orders.id]
+  })
+}));
+
+// Shipment relations
+export const shipmentsRelations = relations(shipments, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [shipments.orderId],
+    references: [orders.id]
+  }),
+  items: many(shipmentItems)
+}));
+
+export const shipmentItemsRelations = relations(shipmentItems, ({ one }) => ({
+  shipment: one(shipments, {
+    fields: [shipmentItems.shipmentId],
+    references: [shipments.id]
+  }),
+  orderItem: one(orderItems, {
+    fields: [shipmentItems.orderItemId],
+    references: [orderItems.id]
+  }),
+  product: one(products, {
+    fields: [shipmentItems.productId],
+    references: [products.id]
+  })
+}));
+
+// Enhanced reviews relations
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   user: one(users, {
     fields: [reviews.userId],
@@ -609,6 +1173,14 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   product: one(products, {
     fields: [reviews.productId],
     references: [products.id]
+  }),
+  order: one(orders, {
+    fields: [reviews.orderId],
+    references: [orders.id]
+  }),
+  orderItem: one(orderItems, {
+    fields: [reviews.orderItemId],
+    references: [orderItems.id]
   })
 }));
 
@@ -747,7 +1319,10 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
 
 export const insertReviewSchema = createInsertSchema(reviews).omit({
   id: true,
-  createdAt: true
+  createdAt: true,
+  updatedAt: true,
+  upvotes: true,
+  downvotes: true
 });
 
 export const insertWishlistSchema = createInsertSchema(wishlists).omit({
@@ -759,6 +1334,56 @@ export const insertWishlistSchema = createInsertSchema(wishlists).omit({
 export const insertWishlistItemSchema = createInsertSchema(wishlistItems).omit({
   id: true,
   addedAt: true
+});
+
+// Order Management Schemas
+export const insertReturnSchema = createInsertSchema(returns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  requestedAt: true
+});
+
+export const insertReturnItemSchema = createInsertSchema(returnItems).omit({
+  id: true
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({
+  id: true
+});
+
+export const insertTrackingSchema = createInsertSchema(tracking).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastChecked: true,
+  attemptCount: true
+});
+
+export const insertTrackingEventSchema = createInsertSchema(trackingEvents).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertOrderStatusHistorySchema = createInsertSchema(orderStatusHistory).omit({
+  id: true,
+  timestamp: true
+});
+
+export const insertShipmentSchema = createInsertSchema(shipments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertShipmentItemSchema = createInsertSchema(shipmentItems).omit({
+  id: true
 });
 
 // Auth validation schemas
@@ -1179,3 +1804,31 @@ export type InsertWishlist = z.infer<typeof insertWishlistSchema>;
 
 export type WishlistItem = typeof wishlistItems.$inferSelect;
 export type InsertWishlistItem = z.infer<typeof insertWishlistItemSchema>;
+
+// Order Management Types
+export type Return = typeof returns.$inferSelect;
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+
+export type ReturnItem = typeof returnItems.$inferSelect;
+export type InsertReturnItem = z.infer<typeof insertReturnItemSchema>;
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+
+export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
+export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
+
+export type Tracking = typeof tracking.$inferSelect;
+export type InsertTracking = z.infer<typeof insertTrackingSchema>;
+
+export type TrackingEvent = typeof trackingEvents.$inferSelect;
+export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;
+
+export type OrderStatusHistory = typeof orderStatusHistory.$inferSelect;
+export type InsertOrderStatusHistory = z.infer<typeof insertOrderStatusHistorySchema>;
+
+export type Shipment = typeof shipments.$inferSelect;
+export type InsertShipment = z.infer<typeof insertShipmentSchema>;
+
+export type ShipmentItem = typeof shipmentItems.$inferSelect;
+export type InsertShipmentItem = z.infer<typeof insertShipmentItemSchema>;

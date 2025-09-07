@@ -1,0 +1,484 @@
+3.4.3 Data Models
+Order Model
+json{
+  "Order": {
+    "orderId": "UUID",
+    "orderNumber": "string",
+    "userId": "UUID",
+    "status": "enum[pending|confirmed|processing|shipped|delivered|cancelled|returned|refunded]",
+    "type": "enum[standard|express|priority|subscription]",
+    "channel": "enum[web|mobile|api|phone|store]",
+    "currency": "string",
+    "items": [{
+      "orderItemId": "UUID",
+      "productId": "UUID",
+      "variantId": "UUID",
+      "sku": "string",
+      "name": "string",
+      "description": "string",
+      "quantity": "integer",
+      "unitPrice": "decimal",
+      "totalPrice": "decimal",
+      "weight": "decimal",
+      "dimensions": {
+        "length": "decimal",
+        "width": "decimal",
+        "height": "decimal"
+      },
+      "customization": {
+        "options": "object",
+        "instructions": "string"
+      },
+      "status": "enum[pending|confirmed|cancelled|returned]"
+    }],
+    "pricing": {
+      "subtotal": "decimal",
+      "tax": {
+        "rate": "decimal",
+        "amount": "decimal",
+        "breakdown": [{
+          "type": "string",
+          "rate": "decimal",
+          "amount": "decimal"
+        }]
+      },
+      "shipping": {
+        "cost": "decimal",
+        "method": "string",
+        "carrier": "string",
+        "estimatedDays": "integer"
+      },
+      "discounts": [{
+        "discountId": "UUID",
+        "code": "string",
+        "type": "enum[percentage|fixed|shipping|bogo]",
+        "amount": "decimal",
+        "description": "string"
+      }],
+      "total": "decimal"
+    },
+    "addresses": {
+      "billing": {
+        "firstName": "string",
+        "lastName": "string",
+        "company": "string",
+        "streetAddress": "string",
+        "streetAddress2": "string",
+        "city": "string",
+        "state": "string",
+        "zipCode": "string",
+        "country": "string",
+        "phone": "string"
+      },
+      "shipping": {
+        "firstName": "string",
+        "lastName": "string",
+        "company": "string",
+        "streetAddress": "string",
+        "streetAddress2": "string",
+        "city": "string",
+        "state": "string",
+        "zipCode": "string",
+        "country": "string",
+        "phone": "string",
+        "instructions": "string"
+      }
+    },
+    "payment": {
+      "paymentId": "UUID",
+      "method": "enum[credit_card|debit_card|paypal|apple_pay|google_pay|bank_transfer|cash_on_delivery]",
+      "status": "enum[pending|authorized|captured|failed|refunded|partially_refunded]",
+      "transactionId": "string",
+      "gateway": "string",
+      "last4": "string",
+      "expiryDate": "string",
+      "cardType": "string",
+      "authorizationCode": "string",
+      "capturedAmount": "decimal",
+      "refundedAmount": "decimal"
+    },
+    "fulfillment": {
+      "warehouseId": "UUID",
+      "pickingList": "string",
+      "packingSlip": "string",
+      "shippingLabel": "string",
+      "trackingNumber": "string",
+      "carrier": "string",
+      "service": "string",
+      "estimatedDelivery": "timestamp",
+      "actualDelivery": "timestamp",
+      "signature": "string",
+      "specialInstructions": "string"
+    },
+    "timeline": [{
+      "event": "string",
+      "status": "string",
+      "timestamp": "timestamp",
+      "description": "string",
+      "actor": "string",
+      "location": "string"
+    }],
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "confirmedAt": "timestamp",
+      "shippedAt": "timestamp",
+      "deliveredAt": "timestamp",
+      "cancelledAt": "timestamp",
+      "source": "string",
+      "notes": "string",
+      "tags": ["string[]"],
+      "priority": "enum[low|normal|high|urgent]",
+      "riskScore": "decimal",
+      "fraudCheck": {
+        "status": "enum[pending|passed|flagged|failed]",
+        "score": "decimal",
+        "reasons": ["string[]"]
+      }
+    }
+  }
+}
+Return/Refund Model
+json{
+  "Return": {
+    "returnId": "UUID",
+    "returnNumber": "string",
+    "orderId": "UUID",
+    "userId": "UUID",
+    "status": "enum[requested|approved|rejected|received|processing|completed|cancelled]",
+    "type": "enum[return|exchange|refund]",
+    "reason": "enum[defective|wrong_item|damaged|not_as_described|changed_mind|size_issue|quality_issue|other]",
+    "items": [{
+      "returnItemId": "UUID",
+      "orderItemId": "UUID",
+      "productId": "UUID",
+      "sku": "string",
+      "name": "string",
+      "quantity": "integer",
+      "unitPrice": "decimal",
+      "refundAmount": "decimal",
+      "condition": "enum[new|used|damaged|defective]",
+      "photos": ["string[]"],
+      "notes": "string"
+    }],
+    "refund": {
+      "refundId": "UUID",
+      "amount": "decimal",
+      "method": "enum[original_payment|store_credit|bank_transfer|check]",
+      "status": "enum[pending|processed|failed|cancelled]",
+      "processedAt": "timestamp",
+      "transactionId": "string",
+      "fees": {
+        "restocking": "decimal",
+        "shipping": "decimal",
+        "processing": "decimal"
+      }
+    },
+    "shipping": {
+      "trackingNumber": "string",
+      "carrier": "string",
+      "label": "string",
+      "cost": "decimal",
+      "paidBy": "enum[customer|merchant]"
+    },
+    "replacement": {
+      "newOrderId": "UUID",
+      "items": [{
+        "productId": "UUID",
+        "variantId": "UUID",
+        "quantity": "integer"
+      }]
+    },
+    "timeline": [{
+      "event": "string",
+      "status": "string",
+      "timestamp": "timestamp",
+      "description": "string",
+      "actor": "string"
+    }],
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "requestedAt": "timestamp",
+      "approvedAt": "timestamp",
+      "receivedAt": "timestamp",
+      "completedAt": "timestamp",
+      "customerNotes": "string",
+      "internalNotes": "string",
+      "photos": ["string[]"],
+      "attachments": ["string[]"]
+    }
+  }
+}
+Invoice Model
+json{
+  "Invoice": {
+    "invoiceId": "UUID",
+    "invoiceNumber": "string",
+    "orderId": "UUID",
+    "userId": "UUID",
+    "status": "enum[draft|sent|paid|overdue|cancelled|void]",
+    "type": "enum[invoice|credit_note|proforma]",
+    "currency": "string",
+    "customerInfo": {
+      "customerId": "UUID",
+      "name": "string",
+      "email": "string",
+      "phone": "string",
+      "address": {
+        "streetAddress": "string",
+        "city": "string",
+        "state": "string",
+        "zipCode": "string",
+        "country": "string"
+      },
+      "taxId": "string",
+      "vatNumber": "string"
+    },
+    "merchantInfo": {
+      "name": "string",
+      "address": {
+        "streetAddress": "string",
+        "city": "string",
+        "state": "string",
+        "zipCode": "string",
+        "country": "string"
+      },
+      "taxId": "string",
+      "vatNumber": "string",
+      "phone": "string",
+      "email": "string",
+      "website": "string"
+    },
+    "lineItems": [{
+      "itemId": "UUID",
+      "productId": "UUID",
+      "sku": "string",
+      "description": "string",
+      "quantity": "integer",
+      "unitPrice": "decimal",
+      "discount": "decimal",
+      "taxRate": "decimal",
+      "taxAmount": "decimal",
+      "totalAmount": "decimal"
+    }],
+    "summary": {
+      "subtotal": "decimal",
+      "discountTotal": "decimal",
+      "taxTotal": "decimal",
+      "shippingTotal": "decimal",
+      "grandTotal": "decimal"
+    },
+    "payment": {
+      "terms": "string",
+      "dueDate": "date",
+      "method": "string",
+      "paidAmount": "decimal",
+      "remainingAmount": "decimal",
+      "paidAt": "timestamp"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "issuedAt": "timestamp",
+      "sentAt": "timestamp",
+      "paidAt": "timestamp",
+      "notes": "string",
+      "terms": "string",
+      "template": "string",
+      "language": "string",
+      "pdfUrl": "string"
+    }
+  }
+}
+Tracking Model
+json{
+  "Tracking": {
+    "trackingId": "UUID",
+    "trackingNumber": "string",
+    "orderId": "UUID",
+    "carrier": "string",
+    "service": "string",
+    "status": "enum[label_created|picked_up|in_transit|out_for_delivery|delivered|exception|returned|cancelled]",
+    "origin": {
+      "name": "string",
+      "address": "string",
+      "city": "string",
+      "state": "string",
+      "zipCode": "string",
+      "country": "string"
+    },
+    "destination": {
+      "name": "string",
+      "address": "string",
+      "city": "string",
+      "state": "string",
+      "zipCode": "string",
+      "country": "string"
+    },
+    "package": {
+      "weight": "decimal",
+      "dimensions": {
+        "length": "decimal",
+        "width": "decimal",
+        "height": "decimal"
+      },
+      "value": "decimal",
+      "description": "string"
+    },
+    "events": [{
+      "eventId": "UUID",
+      "status": "string",
+      "description": "string",
+      "location": {
+        "city": "string",
+        "state": "string",
+        "country": "string",
+        "facility": "string"
+      },
+      "timestamp": "timestamp",
+      "details": "string"
+    }],
+    "delivery": {
+      "estimatedDate": "timestamp",
+      "actualDate": "timestamp",
+      "signedBy": "string",
+      "deliveryNote": "string",
+      "photoUrl": "string",
+      "attemptCount": "integer",
+      "lastAttempt": "timestamp"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "lastChecked": "timestamp",
+      "webhookUrl": "string",
+      "externalTrackingUrl": "string"
+    }
+  }
+}
+Review Model
+json{
+  "Review": {
+    "reviewId": "UUID",
+    "orderId": "UUID",
+    "orderItemId": "UUID",
+    "productId": "UUID",
+    "userId": "UUID",
+    "rating": "integer",
+    "title": "string",
+    "content": "string",
+    "photos": ["string[]"],
+    "videos": ["string[]"],
+    "verified": "boolean",
+    "helpful": {
+      "upvotes": "integer",
+      "downvotes": "integer"
+    },
+    "moderation": {
+      "status": "enum[pending|approved|rejected|flagged]",
+      "moderatedBy": "UUID",
+      "moderatedAt": "timestamp",
+      "reason": "string"
+    },
+    "response": {
+      "merchantReply": "string",
+      "repliedAt": "timestamp",
+      "repliedBy": "UUID"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "source": "enum[web|mobile|email|sms]",
+      "ipAddress": "string",
+      "userAgent": "string",
+      "language": "string"
+    }
+  }
+}
+Order Status History Model
+json{
+  "OrderStatusHistory": {
+    "historyId": "UUID",
+    "orderId": "UUID",
+    "fromStatus": "string",
+    "toStatus": "string",
+    "reason": "string",
+    "notes": "string",
+    "triggeredBy": {
+      "actorId": "UUID",
+      "actorType": "enum[user|admin|system|webhook]",
+      "actorName": "string"
+    },
+    "automation": {
+      "isAutomated": "boolean",
+      "ruleId": "UUID",
+      "ruleName": "string"
+    },
+    "notifications": {
+      "customerNotified": "boolean",
+      "merchantNotified": "boolean",
+      "notificationMethod": ["enum[email|sms|push|webhook]"]
+    },
+    "metadata": {
+      "timestamp": "timestamp",
+      "ipAddress": "string",
+      "userAgent": "string",
+      "source": "string"
+    }
+  }
+}
+Shipment Model
+json{
+  "Shipment": {
+    "shipmentId": "UUID",
+    "shipmentNumber": "string",
+    "orderId": "UUID",
+    "status": "enum[created|picked|packed|shipped|in_transit|delivered|exception|returned]",
+    "type": "enum[standard|expedited|overnight|international]",
+    "items": [{
+      "orderItemId": "UUID",
+      "productId": "UUID",
+      "quantity": "integer",
+      "weight": "decimal"
+    }],
+    "packaging": {
+      "type": "enum[envelope|box|tube|pallet]",
+      "weight": "decimal",
+      "dimensions": {
+        "length": "decimal",
+        "width": "decimal",
+        "height": "decimal"
+      },
+      "materials": ["string[]"]
+    },
+    "carrier": {
+      "name": "string",
+      "service": "string",
+      "account": "string",
+      "trackingNumber": "string",
+      "labelUrl": "string",
+      "cost": "decimal"
+    },
+    "warehouse": {
+      "warehouseId": "UUID",
+      "name": "string",
+      "address": "string"
+    },
+    "timeline": [{
+      "event": "string",
+      "timestamp": "timestamp",
+      "location": "string",
+      "description": "string"
+    }],
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "packedAt": "timestamp",
+      "shippedAt": "timestamp",
+      "deliveredAt": "timestamp",
+      "packedBy": "UUID",
+      "specialInstructions": "string"
+    }
+  }
+}
