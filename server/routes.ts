@@ -1,5 +1,12 @@
 import type { Express, Request, Response } from "express";
 import type { Session } from "express-session";
+
+// Extend the session interface to include userId
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
+}
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
