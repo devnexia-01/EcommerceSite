@@ -413,6 +413,27 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").default(sql`now()`)
 });
 
+// Wishlists table
+export const wishlists = pgTable("wishlists", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull().default("My Wishlist"),
+  description: text("description"),
+  isDefault: boolean("is_default").default(true),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Wishlist items table
+export const wishlistItems = pgTable("wishlist_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  wishlistId: uuid("wishlist_id").references(() => wishlists.id, { onDelete: "cascade" }).notNull(),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  addedAt: timestamp("added_at").default(sql`now()`),
+  notes: text("notes")
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   preferences: one(userPreferences),
@@ -422,6 +443,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   carts: many(carts),
   orders: many(orders),
   reviews: many(reviews),
+  wishlists: many(wishlists),
   refreshTokens: many(refreshTokens),
   passwordResetTokens: many(passwordResetTokens),
   loginSessions: many(loginSessions)
@@ -590,6 +612,25 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   })
 }));
 
+export const wishlistsRelations = relations(wishlists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [wishlists.userId],
+    references: [users.id]
+  }),
+  items: many(wishlistItems)
+}));
+
+export const wishlistItemsRelations = relations(wishlistItems, ({ one }) => ({
+  wishlist: one(wishlists, {
+    fields: [wishlistItems.wishlistId],
+    references: [wishlists.id]
+  }),
+  product: one(products, {
+    fields: [wishlistItems.productId],
+    references: [products.id]
+  })
+}));
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -707,6 +748,17 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
 export const insertReviewSchema = createInsertSchema(reviews).omit({
   id: true,
   createdAt: true
+});
+
+export const insertWishlistSchema = createInsertSchema(wishlists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertWishlistItemSchema = createInsertSchema(wishlistItems).omit({
+  id: true,
+  addedAt: true
 });
 
 // Auth validation schemas
@@ -1121,3 +1173,9 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+
+export type Wishlist = typeof wishlists.$inferSelect;
+export type InsertWishlist = z.infer<typeof insertWishlistSchema>;
+
+export type WishlistItem = typeof wishlistItems.$inferSelect;
+export type InsertWishlistItem = z.infer<typeof insertWishlistItemSchema>;

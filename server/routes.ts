@@ -60,6 +60,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup v1 API routes
   setupV1Routes(app, storage);
+  
+  // Setup wishlist routes
+  const { default: wishlistRoutes } = await import("./wishlist-routes.js");
+  app.use("/api/wishlists", wishlistRoutes);
 
   // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {

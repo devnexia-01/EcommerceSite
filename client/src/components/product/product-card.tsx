@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCart } from "@/hooks/use-enhanced-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useWishlist } from "@/hooks/use-wishlist";
 
 interface Product {
   id: string;
@@ -27,6 +28,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { toggleWishlist, isInWishlist } = useWishlist();
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -57,14 +59,10 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  const handleWishlist = (e: React.MouseEvent) => {
+  const handleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // TODO: Implement wishlist functionality
-    toast({
-      title: "Coming soon",
-      description: "Wishlist functionality coming soon!"
-    });
+    await toggleWishlist(product.id);
   };
 
   const discountPercentage = product.comparePrice 
@@ -110,7 +108,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               onClick={handleWishlist}
               data-testid={`wishlist-button-${product.id}`}
             >
-              <Heart className="h-3 w-3 sm:h-4 sm:w-4" />
+              <Heart className={`h-3 w-3 sm:h-4 sm:w-4 ${isInWishlist[product.id] ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>
           </div>
         </div>
