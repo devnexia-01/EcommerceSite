@@ -346,25 +346,47 @@ export class ProductService {
 
   // Get available filters for products
   async getProductFilters() {
-    const [categoriesData, brandsData, priceRange, attributeOptions] = await Promise.all([
-      db.select().from(categories).where(eq(categories.status, 'active')),
-      db.select().from(brands).where(eq(brands.status, 'active')),
-      db.select({
-        min: sql<number>`MIN(${products.price}::numeric)`,
-        max: sql<number>`MAX(${products.price}::numeric)`
-      }).from(products).where(eq(products.status, 'active')),
-      this.getAttributeOptions()
-    ]);
+    try {
+      const [categoriesData, priceRange, attributeOptions] = await Promise.all([
+        db.select().from(categories).where(eq(categories.status, 'active')),
+        db.select({
+          min: sql<number>`MIN(${products.price}::numeric)`,
+          max: sql<number>`MAX(${products.price}::numeric)`
+        }).from(products).where(eq(products.status, 'active')),
+        this.getAttributeOptions()
+      ]);
 
-    return {
-      categories: categoriesData,
-      brands: brandsData,
-      priceRange: {
-        min: priceRange[0]?.min || 0,
-        max: priceRange[0]?.max || 1000
-      },
-      attributes: attributeOptions
-    };
+      // Get brands separately to handle potential errors
+      let brandsData: any[] = [];
+      try {
+        brandsData = await db.select().from(brands).where(eq(brands.status, 'active'));
+      } catch (error) {
+        console.log('Brands table may not exist yet:', error);
+        brandsData = [];
+      }
+
+      return {
+        categories: categoriesData,
+        brands: brandsData,
+        priceRange: {
+          min: priceRange[0]?.min || 0,
+          max: priceRange[0]?.max || 1000
+        },
+        attributes: attributeOptions
+      };
+    } catch (error) {
+      console.error('Error getting product filters:', error);
+      // Return basic filters if there's an error
+      return {
+        categories: [],
+        brands: [],
+        priceRange: {
+          min: 0,
+          max: 1000
+        },
+        attributes: {}
+      };
+    }
   }
 
   // Get unique attribute options from all products
