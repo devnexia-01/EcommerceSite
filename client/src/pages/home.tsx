@@ -170,10 +170,10 @@ export default function Home() {
           <div className="flex items-center justify-between mb-12">
             <div>
               <h3 className="text-4xl font-serif font-semibold text-foreground mb-4" data-testid="featured-title">
-                Featured Collection
+                Featured Products
               </h3>
               <p className="text-muted-foreground text-xl max-w-lg">
-                Discover our most loved furniture pieces, handpicked by our design experts
+                Handpicked items just for you
               </p>
             </div>
             <Button asChild className="furniture-btn-secondary" data-testid="view-all-products">
@@ -187,7 +187,7 @@ export default function Home() {
           {products.length === 0 ? (
             <div className="text-center py-16">
               <LoadingSpinner className="mx-auto mb-4" data-testid="products-loading" />
-              <p className="text-muted-foreground text-lg">Loading featured collection...</p>
+              <p className="text-muted-foreground text-lg">Loading featured products...</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -203,10 +203,10 @@ export default function Home() {
       <section className="bg-primary text-primary-foreground py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h3 className="text-4xl font-serif font-semibold mb-6" data-testid="newsletter-title">
-            Design Inspiration Delivered
+            Stay in the Loop
           </h3>
           <p className="text-xl mb-10 text-primary-foreground/90 max-w-2xl mx-auto leading-relaxed">
-            Get the latest trends, exclusive previews, and interior design tips straight to your inbox. Join our community of design enthusiasts.
+            Subscribe to our newsletter for the latest updates and exclusive offers
           </p>
           <div className="flex flex-col sm:flex-row gap-4 max-w-lg mx-auto">
             <input

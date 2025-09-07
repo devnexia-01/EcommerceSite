@@ -51,10 +51,10 @@ export default function Categories() {
         {/* Header */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-serif font-semibold text-foreground mb-6" data-testid="categories-title">
-            Shop by Room
+            Shop by Category
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Discover furniture collections tailored to every space in your home. From cozy living rooms to elegant dining spaces, find pieces that perfectly complement your lifestyle.
+            Explore our wide range of product categories. Find exactly what you're looking for with our organized collections.
           </p>
         </div>
 

@@ -169,10 +169,10 @@ export default function Products() {
                 <h1 className="text-3xl font-serif font-semibold text-foreground" data-testid="products-title">
                   {searchQuery ? `Search results for "${searchQuery}"` : 
                    selectedCategory ? (categories as any[]).find((c: any) => c.id === selectedCategory)?.name || 'Products' : 
-                   'All Furniture'}
+                   'All Products'}
                 </h1>
                 <p className="text-muted-foreground text-lg mt-2" data-testid="results-count">
-                  Showing {Math.min(products.length, itemsPerPage)} of {totalProducts} pieces
+                  Showing {Math.min(products.length, itemsPerPage)} of {totalProducts} products
                 </p>
               </div>
 
