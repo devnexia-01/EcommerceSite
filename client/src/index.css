@@ -82,10 +82,18 @@
   }
   
   .furniture-btn-primary {
-    @apply bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 rounded-lg transition-all duration-200;
+    @apply bg-primary hover:bg-primary text-primary-foreground font-medium px-8 py-3 rounded-lg transition-all duration-200;
+    filter: brightness(1);
+  }
+  .furniture-btn-primary:hover {
+    filter: brightness(0.9);
   }
   
   .furniture-btn-secondary {
-    @apply bg-secondary hover:bg-secondary/80 text-secondary-foreground font-medium px-8 py-3 rounded-lg border border-border transition-all duration-200;
+    @apply bg-secondary hover:bg-secondary text-secondary-foreground font-medium px-8 py-3 rounded-lg border border-border transition-all duration-200;
+    filter: brightness(1);
+  }
+  .furniture-btn-secondary:hover {
+    filter: brightness(0.8);
   }
 }

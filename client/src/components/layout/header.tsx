@@ -45,26 +45,26 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm" data-testid="header">
+      <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border shadow-sm" data-testid="header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <div className="flex items-center">
               <Link href="/">
-                <h1 className="text-2xl font-bold text-primary cursor-pointer" data-testid="logo">
-                  EliteCommerce
+                <h1 className="text-3xl font-serif font-semibold text-primary cursor-pointer tracking-tight" data-testid="logo">
+                  FURNISH
                 </h1>
               </Link>
 
               {/* Desktop Navigation */}
-              <nav className="hidden md:ml-8 md:flex space-x-8">
+              <nav className="hidden md:ml-12 md:flex space-x-10">
                 {navigationItems.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`font-medium transition-colors ${
+                    className={`font-medium text-sm uppercase tracking-wide transition-colors ${
                       location === item.href
-                        ? "text-primary"
+                        ? "text-primary border-b-2 border-primary pb-1"
                         : "text-muted-foreground hover:text-primary"
                     }`}
                     data-testid={`nav-${item.name.toLowerCase()}`}
@@ -76,21 +76,21 @@ export default function Header() {
             </div>
 
             {/* Search Bar */}
-            <div className="flex-1 max-w-md mx-4">
+            <div className="flex-1 max-w-lg mx-6">
               <form onSubmit={handleSearch} className="relative">
                 <Input
                   type="text"
-                  placeholder="Search products..."
+                  placeholder="Search furniture & home decor..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4"
+                  className="w-full pl-12 pr-24 h-12 bg-background border-border rounded-full focus:ring-2 focus:ring-primary/20"
                   data-testid="search-input"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Button 
                   type="submit" 
                   size="sm" 
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-4 rounded-full furniture-btn-primary"
                   data-testid="search-button"
                 >
                   Search
@@ -99,19 +99,19 @@ export default function Header() {
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {/* Cart */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative"
+                className="relative h-12 w-12 rounded-full hover:bg-secondary/50"
                 onClick={() => setIsCartOpen(true)}
                 data-testid="cart-button"
               >
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCart className="h-6 w-6" />
                 {totalItems > 0 && (
                   <Badge 
-                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    className="absolute -top-1 -right-1 h-6 w-6 flex items-center justify-center p-0 text-xs bg-primary text-primary-foreground"
                     data-testid="cart-badge"
                   >
                     {totalItems}
@@ -122,8 +122,8 @@ export default function Header() {
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="user-menu-button">
-                    <User className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full hover:bg-secondary/50" data-testid="user-menu-button">
+                    <User className="h-6 w-6" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -165,24 +165,27 @@ export default function Header() {
               {/* Mobile Menu Button */}
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden" data-testid="mobile-menu-button">
-                    <Menu className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="md:hidden h-12 w-12 rounded-full hover:bg-secondary/50" data-testid="mobile-menu-button">
+                    <Menu className="h-6 w-6" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                  <nav className="flex flex-col space-y-4 mt-4">
-                    {navigationItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className="text-lg font-medium hover:text-primary transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        data-testid={`mobile-nav-${item.name.toLowerCase()}`}
-                      >
-                        {item.name}
-                      </Link>
-                    ))}
-                  </nav>
+                <SheetContent side="right" className="w-[300px] sm:w-[400px] bg-card">
+                  <div className="mt-8">
+                    <h2 className="text-2xl font-serif font-semibold text-primary mb-8">FURNISH</h2>
+                    <nav className="flex flex-col space-y-6">
+                      {navigationItems.map((item) => (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className="text-lg font-medium text-foreground hover:text-primary transition-colors border-b border-border/30 pb-2"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          data-testid={`mobile-nav-${item.name.toLowerCase()}`}
+                        >
+                          {item.name}
+                        </Link>
+                      ))}
+                    </nav>
+                  </div>
                 </SheetContent>
               </Sheet>
             </div>
