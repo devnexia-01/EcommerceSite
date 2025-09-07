@@ -17,6 +17,14 @@ import Profile from "./pages/profile";
 import Admin from "./pages/admin";
 import Login from "./pages/login";
 import Register from "./pages/register";
+import About from "./pages/about";
+import Contact from "./pages/contact";
+import Careers from "./pages/careers";
+import Press from "./pages/press";
+import Help from "./pages/help";
+import Returns from "./pages/returns";
+import Shipping from "./pages/shipping";
+import SizeGuide from "./pages/size-guide";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -32,6 +40,14 @@ function Router() {
       <Route path="/admin" component={Admin} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/careers" component={Careers} />
+      <Route path="/press" component={Press} />
+      <Route path="/help" component={Help} />
+      <Route path="/returns" component={Returns} />
+      <Route path="/shipping" component={Shipping} />
+      <Route path="/size-guide" component={SizeGuide} />
       <Route component={NotFound} />
     </Switch>
   );
