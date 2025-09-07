@@ -119,24 +119,55 @@ export function setupOrderManagementRoutes(app: Express): void {
 
       // Create order items
       for (const item of orderData.items) {
+        // Get product details for order item
+        const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+        const totalPrice = (parseFloat(item.price) * item.quantity).toFixed(2);
+        
         await db.insert(orderItems).values({
           orderId: newOrder.id,
           productId: item.productId,
+          sku: product?.sku || `SKU-${Date.now()}`,
+          name: product?.name || 'Product',
           quantity: item.quantity,
-          price: item.price
+          unitPrice: item.price,
+          totalPrice: totalPrice,
+          price: item.price,
+          total: totalPrice
         });
       }
 
       // Create invoice
       await db.insert(invoices).values({
         orderId: newOrder.id,
+        userId: newOrder.userId,
         invoiceNumber: `INV-${newOrder.orderNumber}`,
-        status: "pending",
-        subtotal: subtotal.toFixed(2),
-        tax: tax.toFixed(2),
-        total: total.toFixed(2),
+        status: "draft",
         currency: orderData.currency,
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+        customerInfo: {
+          name: `${orderData.billingAddress.firstName} ${orderData.billingAddress.lastName}`,
+          email: req.user?.email || 'customer@example.com',
+          address: {
+            streetAddress: orderData.billingAddress.streetAddress,
+            city: orderData.billingAddress.city,
+            state: orderData.billingAddress.state,
+            zipCode: orderData.billingAddress.zipCode,
+            country: orderData.billingAddress.country
+          }
+        },
+        merchantInfo: {
+          name: "Your Store",
+          address: {
+            streetAddress: "123 Business St",
+            city: "Business City",
+            state: "CA",
+            zipCode: "90210",
+            country: "US"
+          }
+        },
+        subtotal: subtotal.toFixed(2),
+        taxTotal: tax.toFixed(2),
+        shippingTotal: shipping.toFixed(2),
+        grandTotal: total.toFixed(2)
       });
 
       // Return order with items
@@ -269,7 +300,7 @@ export function setupOrderManagementRoutes(app: Express): void {
           trackingNumber: updateData.trackingNumber,
           carrier: "ups", // Default carrier
           status: "in_transit",
-          estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days from now
+          estimatedDeliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days from now
         });
 
         // Add tracking event
@@ -279,7 +310,12 @@ export function setupOrderManagementRoutes(app: Express): void {
             trackingId: trackingRecord.id,
             status: "shipped",
             description: "Package has been shipped",
-            location: "Fulfillment Center",
+            location: {
+              city: "Fulfillment",
+              state: "CA",
+              country: "US",
+              facility: "Fulfillment Center"
+            },
             timestamp: new Date()
           });
         }
@@ -310,7 +346,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       }
 
       // Check if user has access to cancel this order
-      if (!isAdmin && order.userId !== userId) {
+      if (!isAdmin && order.userId !== (userId || '')) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -365,7 +401,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       }
 
       // Check if user owns this order
-      if (order.userId !== userId) {
+      if (order.userId !== (userId || '')) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -380,12 +416,12 @@ export function setupOrderManagementRoutes(app: Express): void {
       // Create return record
       const [returnRecord] = await db.insert(returns).values({
         orderId,
+        userId: userId || '',
         returnNumber,
         status: "requested",
         reason: returnData.reason,
         type: returnData.returnType,
-        notes: returnData.notes,
-        requestedBy: userId
+        customerNotes: returnData.notes
       }).returning();
 
       // Calculate return amount
