@@ -166,13 +166,13 @@ export default function Products() {
             {/* Toolbar */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-foreground" data-testid="products-title">
+                <h1 className="text-3xl font-serif font-semibold text-foreground" data-testid="products-title">
                   {searchQuery ? `Search results for "${searchQuery}"` : 
                    selectedCategory ? (categories as any[]).find((c: any) => c.id === selectedCategory)?.name || 'Products' : 
-                   'All Products'}
+                   'All Furniture'}
                 </h1>
-                <p className="text-muted-foreground" data-testid="results-count">
-                  Showing {Math.min(products.length, itemsPerPage)} of {totalProducts} products
+                <p className="text-muted-foreground text-lg mt-2" data-testid="results-count">
+                  Showing {Math.min(products.length, itemsPerPage)} of {totalProducts} pieces
                 </p>
               </div>
 

@@ -49,12 +49,12 @@ export default function Categories() {
     <div className="min-h-screen bg-background" data-testid="categories-page">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4" data-testid="categories-title">
-            Shop by Category
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-serif font-semibold text-foreground mb-6" data-testid="categories-title">
+            Shop by Room
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Explore our wide range of product categories. Find exactly what you're looking for with our organized collections.
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            Discover furniture collections tailored to every space in your home. From cozy living rooms to elegant dining spaces, find pieces that perfectly complement your lifestyle.
           </p>
         </div>
 
