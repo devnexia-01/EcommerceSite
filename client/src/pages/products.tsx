@@ -98,23 +98,23 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="products-page">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           {/* Filters Sidebar */}
           <div className="lg:w-64 flex-shrink-0">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                   <span>Filters</span>
-                  <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="clear-filters">
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs sm:text-sm" data-testid="clear-filters">
                     Clear All
                   </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6">
                 {/* Search */}
                 <div>
-                  <Label htmlFor="search" className="text-sm font-medium mb-2 block">
+                  <Label htmlFor="search" className="text-xs sm:text-sm font-medium mb-2 block">
                     Search
                   </Label>
                   <form onSubmit={handleSearch}>
@@ -122,6 +122,7 @@ export default function Products() {
                       id="search"
                       type="text"
                       placeholder="Search products..."
+                      className="text-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       data-testid="products-search"
@@ -131,7 +132,7 @@ export default function Products() {
 
                 {/* Categories */}
                 <div>
-                  <Label className="text-sm font-medium mb-3 block">Categories</Label>
+                  <Label className="text-xs sm:text-sm font-medium mb-2 sm:mb-3 block">Categories</Label>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -140,7 +141,7 @@ export default function Products() {
                         onCheckedChange={() => handleCategoryChange("")}
                         data-testid="category-all"
                       />
-                      <Label htmlFor="category-all" className="text-sm">All Categories</Label>
+                      <Label htmlFor="category-all" className="text-xs sm:text-sm cursor-pointer">All Categories</Label>
                     </div>
                     {categories.map((category: any) => (
                       <div key={category.id} className="flex items-center space-x-2">
@@ -150,7 +151,7 @@ export default function Products() {
                           onCheckedChange={() => handleCategoryChange(category.id)}
                           data-testid={`category-${category.slug}`}
                         />
-                        <Label htmlFor={`category-${category.id}`} className="text-sm">
+                        <Label htmlFor={`category-${category.id}`} className="text-xs sm:text-sm cursor-pointer">
                           {category.name}
                         </Label>
                       </div>
@@ -164,21 +165,21 @@ export default function Products() {
           {/* Main Content */}
           <div className="flex-1">
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div>
-                <h1 className="text-3xl font-serif font-semibold text-foreground" data-testid="products-title">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif font-semibold text-foreground" data-testid="products-title">
                   {searchQuery ? `Search results for "${searchQuery}"` : 
                    selectedCategory ? (categories as any[]).find((c: any) => c.id === selectedCategory)?.name || 'Products' : 
                    'All Products'}
                 </h1>
-                <p className="text-muted-foreground text-lg mt-2" data-testid="results-count">
+                <p className="text-muted-foreground text-sm sm:text-base lg:text-lg mt-1 sm:mt-2" data-testid="results-count">
                   Showing {Math.min(products.length, itemsPerPage)} of {totalProducts} products
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 <Select value={`${sortBy}-${sortOrder}`} onValueChange={handleSortChange} data-testid="sort-select">
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-full sm:w-[200px] text-sm">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -192,7 +193,7 @@ export default function Products() {
                   </SelectContent>
                 </Select>
 
-                <div className="flex border border-input rounded-lg">
+                <div className="hidden sm:flex border border-input rounded-lg">
                   <Button
                     variant={viewMode === "grid" ? "default" : "ghost"}
                     size="icon"
@@ -250,9 +251,9 @@ export default function Products() {
               </div>
             ) : (
               <>
-                <div className={`grid gap-6 ${
+                <div className={`grid gap-4 sm:gap-6 ${
                   viewMode === "grid" 
-                    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" 
+                    ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" 
                     : "grid-cols-1"
                 }`}>
                   {products.map((product: any) => (
@@ -262,22 +263,27 @@ export default function Products() {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex justify-center items-center space-x-2 mt-12">
+                  <div className="flex justify-center items-center space-x-1 sm:space-x-2 mt-8 sm:mt-12">
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                       disabled={currentPage === 1}
+                      className="text-xs sm:text-sm"
                       data-testid="prev-page"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
+                      <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline ml-1">Previous</span>
+                      <span className="sm:hidden ml-1">Prev</span>
                     </Button>
 
                     {getPaginationRange().map((page) => (
                       <Button
                         key={page}
                         variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
                         onClick={() => setCurrentPage(page)}
+                        className="text-xs sm:text-sm w-8 sm:w-auto"
                         data-testid={`page-${page}`}
                       >
                         {page}
@@ -286,12 +292,15 @@ export default function Products() {
 
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                       disabled={currentPage === totalPages}
+                      className="text-xs sm:text-sm"
                       data-testid="next-page"
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
+                      <span className="hidden sm:inline mr-1">Next</span>
+                      <span className="sm:hidden mr-1">Next</span>
+                      <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
                 )}
