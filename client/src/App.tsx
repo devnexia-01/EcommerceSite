@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "./hooks/use-auth";
-import { CartProvider } from "./hooks/use-cart";
+import { EnhancedCartProvider } from "./hooks/use-enhanced-cart";
 import Header from "./components/layout/header";
 import Footer from "./components/layout/footer";
 import Home from "./pages/home";
@@ -42,7 +42,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <CartProvider>
+          <EnhancedCartProvider>
             <div className="min-h-screen flex flex-col">
               <Header />
               <main className="flex-1">
@@ -51,7 +51,7 @@ function App() {
               <Footer />
             </div>
             <Toaster />
-          </CartProvider>
+          </EnhancedCartProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
