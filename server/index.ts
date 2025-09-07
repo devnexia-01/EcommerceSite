@@ -2,6 +2,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { 
+  securityMonitor, 
+  rateLimitMonitor, 
+  loginAttemptMonitor,
+  SystemMetricsCollector 
+} from "./activity-tracker";
 
 const app = express();
 app.use(express.json());
@@ -17,6 +23,11 @@ app.use(session({
     maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
   }
 }));
+
+// Security and activity monitoring middleware
+app.use(securityMonitor);
+app.use(rateLimitMonitor);
+app.use(loginAttemptMonitor);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -72,6 +83,10 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
+  // Initialize system metrics collector
+  const metricsCollector = SystemMetricsCollector.getInstance();
+  metricsCollector.start();
+
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
@@ -79,5 +94,6 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    log(`real-time monitoring and security features activated`);
   });
 })();

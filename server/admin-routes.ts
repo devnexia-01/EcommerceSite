@@ -134,19 +134,152 @@ export function setupAdminRoutes(app: Express) {
     }
   });
 
-  // GET /api/v1/admin/dashboard/system-health
+  // GET /api/v1/admin/dashboard/system-health - Enhanced with real-time metrics
   app.get('/api/v1/admin/dashboard/system-health', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const health = await adminStorage.getSystemHealth();
-      res.json({
-        success: true,
-        data: health
-      });
+      
+      // Get real-time metrics from metrics collector
+      try {
+        const { SystemMetricsCollector } = await import('./activity-tracker');
+        const metricsCollector = SystemMetricsCollector.getInstance();
+        const realTimeMetrics = metricsCollector.getMetrics();
+        const healthStatus = metricsCollector.getHealthStatus();
+        
+        res.json({
+          success: true,
+          data: {
+            ...health,
+            realTimeMetrics,
+            healthStatus,
+            timestamp: new Date()
+          }
+        });
+      } catch (importError) {
+        // Fallback to basic health data if metrics unavailable
+        res.json({
+          success: true,
+          data: {
+            ...health,
+            timestamp: new Date()
+          }
+        });
+      }
     } catch (error: any) {
       console.error('System health error:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Failed to fetch system health' 
+      });
+    }
+  });
+
+  // Real-time monitoring endpoints
+  app.get('/api/v1/admin/monitoring/live-activity', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { limit = '20' } = req.query;
+      
+      // Get recent audit logs for live activity feed
+      const recentActivity = await adminStorage.getAuditLogs({
+        limit: parseInt(limit as string),
+        offset: 0
+      });
+
+      // Get recent security events
+      const recentSecurityEvents = await adminStorage.getSecurityLogs({
+        limit: 10,
+        offset: 0
+      });
+
+      res.json({
+        success: true,
+        data: {
+          recentActivity: recentActivity.logs,
+          securityEvents: recentSecurityEvents.logs,
+          timestamp: new Date()
+        }
+      });
+    } catch (error: any) {
+      console.error('Live activity error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch live activity' 
+      });
+    }
+  });
+
+  app.get('/api/v1/admin/monitoring/alerts', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Get unresolved security threats as alerts
+      const securityAlerts = await adminStorage.getSecurityLogs({
+        resolved: false,
+        limit: 50
+      });
+
+      // Get failed login attempts from last hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const recentFailedLogins = await adminStorage.getFailedLogins({
+        startDate: oneHourAgo,
+        limit: 10
+      });
+
+      res.json({
+        success: true,
+        data: {
+          securityAlerts: securityAlerts.logs,
+          recentFailedLogins: recentFailedLogins.logs,
+          alertCount: securityAlerts.total,
+          timestamp: new Date()
+        }
+      });
+    } catch (error: any) {
+      console.error('Alerts error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch alerts' 
+      });
+    }
+  });
+
+  app.get('/api/v1/admin/monitoring/system-status', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Get active user count (users active in last 24 hours)
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const activeUsersResult = await adminStorage.getAllUsers({
+        limit: 1000 // Get enough to count
+      });
+      
+      const activeUsers = activeUsersResult.users.filter(user => 
+        user.lastLoginAt && new Date(user.lastLoginAt) > yesterday
+      ).length;
+
+      // Get recent error count from audit logs
+      const recentErrors = await adminStorage.getAuditLogs({
+        severity: 'high',
+        limit: 100
+      });
+
+      const errorCount = recentErrors.logs.filter(log => 
+        new Date(log.timestamp) > yesterday
+      ).length;
+
+      res.json({
+        success: true,
+        data: {
+          activeUsers,
+          errorCount,
+          systemUptime: process.uptime(),
+          memoryUsage: process.memoryUsage(),
+          nodeVersion: process.version,
+          environment: process.env.NODE_ENV || 'development',
+          timestamp: new Date()
+        }
+      });
+    } catch (error: any) {
+      console.error('System status error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch system status' 
       });
     }
   });
