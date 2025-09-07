@@ -4,15 +4,24 @@ import { z } from "zod";
 
 const router = express.Router();
 
+// Enhanced request interface with user data
+interface AuthenticatedRequest extends express.Request {
+  user?: {
+    id: string;
+    email: string;
+    isAdmin?: boolean;
+  };
+}
+
 // Middleware to extract user info from session or token
-const getUserInfo = (req: express.Request) => {
+const getUserInfo = (req: AuthenticatedRequest) => {
   const userId = req.user?.id; // From authentication middleware
   const sessionId = req.sessionID || req.headers['x-session-id'] as string;
   return { userId, sessionId };
 };
 
 // Error handler wrapper
-const asyncHandler = (fn: Function) => (req: express.Request, res: express.Response, next: express.NextFunction) => {
+const asyncHandler = (fn: Function) => (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
@@ -48,7 +57,7 @@ const applyCouponSchema = z.object({
 });
 
 // GET /api/v1/cart/{userId} - Get cart for user
-router.get('/', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
   if (!userId && !sessionId) {
@@ -91,7 +100,7 @@ router.get('/', asyncHandler(async (req: express.Request, res: express.Response)
 }));
 
 // POST /api/v1/cart/{userId}/items - Add item to cart
-router.post('/items', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.post('/items', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
   if (!userId && !sessionId) {
@@ -125,7 +134,7 @@ router.post('/items', asyncHandler(async (req: express.Request, res: express.Res
 }));
 
 // PUT /api/v1/cart/{userId}/items/{itemId} - Update cart item
-router.put('/items/:itemId', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.put('/items/:itemId', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { itemId } = req.params;
   
   if (!itemId) {
@@ -157,7 +166,7 @@ router.put('/items/:itemId', asyncHandler(async (req: express.Request, res: expr
 }));
 
 // DELETE /api/v1/cart/{userId}/items/{itemId} - Remove item from cart
-router.delete('/items/:itemId', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.delete('/items/:itemId', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { itemId } = req.params;
   
   if (!itemId) {
@@ -180,7 +189,7 @@ router.delete('/items/:itemId', asyncHandler(async (req: express.Request, res: e
 }));
 
 // POST /api/v1/cart/{userId}/clear - Clear entire cart
-router.post('/clear', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.post('/clear', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
   if (!userId && !sessionId) {
@@ -205,7 +214,7 @@ router.post('/clear', asyncHandler(async (req: express.Request, res: express.Res
 }));
 
 // POST /api/v1/cart/{userId}/merge - Merge guest cart with user cart
-router.post('/merge', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.post('/merge', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId } = getUserInfo(req);
   const { guestSessionId } = req.body;
   
@@ -237,7 +246,7 @@ router.post('/merge', asyncHandler(async (req: express.Request, res: express.Res
 }));
 
 // GET /api/v1/cart/{userId}/validate - Validate cart items
-router.get('/validate', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.get('/validate', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
   if (!userId && !sessionId) {
@@ -262,7 +271,7 @@ router.get('/validate', asyncHandler(async (req: express.Request, res: express.R
 }));
 
 // POST /api/v1/cart/{userId}/save-for-later - Save items for later
-router.post('/save-for-later', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.post('/save-for-later', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { itemIds } = req.body;
   
   if (!itemIds || !Array.isArray(itemIds)) {
@@ -287,7 +296,7 @@ router.post('/save-for-later', asyncHandler(async (req: express.Request, res: ex
 }));
 
 // POST /api/v1/cart/{userId}/move-to-cart - Move saved items back to cart
-router.post('/move-to-cart', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.post('/move-to-cart', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { itemIds } = req.body;
   
   if (!itemIds || !Array.isArray(itemIds)) {
@@ -312,7 +321,7 @@ router.post('/move-to-cart', asyncHandler(async (req: express.Request, res: expr
 }));
 
 // POST /api/v1/cart/{userId}/coupons - Apply coupon to cart
-router.post('/coupons', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.post('/coupons', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
   if (!userId && !sessionId) {
@@ -345,7 +354,7 @@ router.post('/coupons', asyncHandler(async (req: express.Request, res: express.R
 }));
 
 // DELETE /api/v1/cart/{userId}/coupons/{couponId} - Remove coupon from cart
-router.delete('/coupons/:couponId', asyncHandler(async (req: express.Request, res: express.Response) => {
+router.delete('/coupons/:couponId', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { couponId } = req.params;
   
   if (!couponId) {
@@ -368,7 +377,7 @@ router.delete('/coupons/:couponId', asyncHandler(async (req: express.Request, re
 }));
 
 // Error handling middleware
-router.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+router.use((error: any, req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
   console.error('Cart API Error:', error);
   
   if (error instanceof z.ZodError) {
