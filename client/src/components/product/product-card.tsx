@@ -72,13 +72,13 @@ export default function ProductCard({ product }: ProductCardProps) {
     : 0;
 
   return (
-    <Card className="group hover:shadow-lg transition-shadow duration-300" data-testid={`product-card-${product.id}`}>
+    <Card className="furniture-card group" data-testid={`product-card-${product.id}`}>
       <Link href={`/product/${product.slug}`}>
-        <div className="relative aspect-square overflow-hidden rounded-t-lg">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg">
           <img
-            src={product.imageUrl || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"}
+            src={product.imageUrl || "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300"}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
             data-testid={`product-image-${product.id}`}
           />
           
@@ -115,45 +115,56 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <h4 className="font-medium text-foreground group-hover:text-primary transition-colors cursor-pointer line-clamp-2" data-testid={`product-name-${product.id}`}>
-              {product.name}
-            </h4>
-            <div className="flex items-center text-sm text-muted-foreground ml-2">
-              <Star className="h-4 w-4 text-yellow-500 mr-1" />
-              <span data-testid={`product-rating-${product.id}`}>
-                {parseFloat(product.rating).toFixed(1)}
-              </span>
-              {product.reviewCount > 0 && (
-                <span className="ml-1" data-testid={`review-count-${product.id}`}>
-                  ({product.reviewCount})
+        <CardContent className="p-6">
+          <div className="space-y-3">
+            <div>
+              <h4 className="font-serif text-lg font-semibold text-foreground group-hover:text-primary transition-colors cursor-pointer leading-tight" data-testid={`product-name-${product.id}`}>
+                {product.name}
+              </h4>
+              <div className="flex items-center mt-1">
+                <div className="flex items-center">
+                  {[...Array(5)].map((_, i) => (
+                    <Star 
+                      key={i}
+                      className={`h-3 w-3 ${i < Math.floor(parseFloat(product.rating)) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground ml-2" data-testid={`product-rating-${product.id}`}>
+                  {parseFloat(product.rating).toFixed(1)}
+                  {product.reviewCount > 0 && (
+                    <span className="ml-1" data-testid={`review-count-${product.id}`}>
+                      ({product.reviewCount})
+                    </span>
+                  )}
                 </span>
-              )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-lg font-bold text-foreground" data-testid={`product-price-${product.id}`}>
-                ${parseFloat(product.price).toFixed(2)}
-              </span>
-              {product.comparePrice && (
-                <span className="text-sm text-muted-foreground line-through" data-testid={`compare-price-${product.id}`}>
-                  ${parseFloat(product.comparePrice).toFixed(2)}
-                </span>
-              )}
+            <div className="flex items-center justify-between pt-2">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl font-serif font-bold text-foreground" data-testid={`product-price-${product.id}`}>
+                    ${parseFloat(product.price).toFixed(2)}
+                  </span>
+                  {product.comparePrice && (
+                    <span className="text-sm text-muted-foreground line-through" data-testid={`compare-price-${product.id}`}>
+                      ${parseFloat(product.comparePrice).toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleAddToCart}
+                disabled={product.stock === 0}
+                className="furniture-btn-primary h-10 px-4"
+                data-testid={`add-to-cart-${product.id}`}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Add to Cart
+              </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={handleAddToCart}
-              disabled={product.stock === 0}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              data-testid={`add-to-cart-${product.id}`}
-            >
-              <ShoppingCart className="h-4 w-4 mr-1" />
-              Add to Cart
-            </Button>
           </div>
         </CardContent>
       </Link>
