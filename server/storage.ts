@@ -1173,26 +1173,147 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductVariants(productId: string): Promise<any[]> {
-    // For now, return empty array as we'll implement variants later
-    return [];
+    const variants = await db.select().from(productVariants)
+      .where(eq(productVariants.productId, productId))
+      .orderBy(asc(productVariants.createdAt));
+    
+    return variants.map(variant => ({
+      variantId: variant.id,
+      sku: variant.sku,
+      attributes: variant.attributes || {},
+      pricing: {
+        price: variant.price,
+        compareAtPrice: variant.compareAtPrice
+      },
+      inventory: {
+        quantity: variant.quantity,
+        reserved: variant.reserved
+      },
+      media: variant.media || [],
+      status: variant.status,
+      createdAt: variant.createdAt,
+      updatedAt: variant.updatedAt
+    }));
+  }
+
+  async createProductVariant(productId: string, variantData: any): Promise<any> {
+    const [newVariant] = await db.insert(productVariants).values({
+      productId,
+      sku: variantData.sku,
+      attributes: variantData.attributes || {},
+      price: variantData.pricing?.price || "0",
+      compareAtPrice: variantData.pricing?.compareAtPrice,
+      quantity: variantData.inventory?.quantity || 0,
+      reserved: variantData.inventory?.reserved || 0,
+      media: variantData.media || [],
+      status: variantData.status || "active"
+    } as any).returning();
+    
+    return {
+      variantId: newVariant.id,
+      sku: newVariant.sku,
+      attributes: newVariant.attributes,
+      pricing: {
+        price: newVariant.price,
+        compareAtPrice: newVariant.compareAtPrice
+      },
+      inventory: {
+        quantity: newVariant.quantity,
+        reserved: newVariant.reserved
+      },
+      media: newVariant.media,
+      status: newVariant.status
+    };
+  }
+
+  async updateProductVariant(variantId: string, variantData: any): Promise<any> {
+    const updateData: any = {
+      updatedAt: sql`now()`
+    };
+    
+    if (variantData.sku) updateData.sku = variantData.sku;
+    if (variantData.attributes) updateData.attributes = variantData.attributes;
+    if (variantData.pricing?.price) updateData.price = variantData.pricing.price;
+    if (variantData.pricing?.compareAtPrice) updateData.compareAtPrice = variantData.pricing.compareAtPrice;
+    if (variantData.inventory?.quantity !== undefined) updateData.quantity = variantData.inventory.quantity;
+    if (variantData.inventory?.reserved !== undefined) updateData.reserved = variantData.inventory.reserved;
+    if (variantData.media) updateData.media = variantData.media;
+    if (variantData.status) updateData.status = variantData.status;
+    
+    const [updatedVariant] = await db.update(productVariants)
+      .set(updateData)
+      .where(eq(productVariants.id, variantId))
+      .returning();
+    
+    return updatedVariant;
+  }
+
+  async deleteProductVariant(variantId: string): Promise<void> {
+    await db.delete(productVariants).where(eq(productVariants.id, variantId));
   }
 
   async addProductMedia(productId: string, mediaData: any): Promise<any> {
-    // For now, add to the images array
-    const product = await this.getProduct(productId);
-    if (!product) throw new Error("Product not found");
-
-    const updatedImages = [...(product.images || []), mediaData.url];
-    await db.update(products)
-      .set({ images: updatedImages })
-      .where(eq(products.id, productId));
-
-    return {
-      mediaId: `${productId}-${updatedImages.length - 1}`,
+    // Create entry in product_media table
+    const [newMedia] = await db.insert(productMedia).values({
+      productId,
       type: mediaData.type || "image",
       url: mediaData.url,
-      position: updatedImages.length - 1
+      thumbnailUrl: mediaData.thumbnailUrl,
+      alt: mediaData.alt,
+      position: mediaData.position || 0
+    } as any).returning();
+    
+    // Also update the legacy images array for backward compatibility
+    const product = await this.getProduct(productId);
+    if (product) {
+      const updatedImages = [...(product.images || []), mediaData.url];
+      await db.update(products)
+        .set({ images: updatedImages })
+        .where(eq(products.id, productId));
+    }
+    
+    return {
+      mediaId: newMedia.id,
+      type: newMedia.type,
+      url: newMedia.url,
+      thumbnailUrl: newMedia.thumbnailUrl,
+      alt: newMedia.alt,
+      position: newMedia.position
     };
+  }
+
+  async getProductMedia(productId: string): Promise<any[]> {
+    const mediaList = await db.select().from(productMedia)
+      .where(eq(productMedia.productId, productId))
+      .orderBy(asc(productMedia.position));
+    
+    return mediaList.map(media => ({
+      mediaId: media.id,
+      type: media.type,
+      url: media.url,
+      thumbnailUrl: media.thumbnailUrl,
+      alt: media.alt,
+      position: media.position
+    }));
+  }
+
+  async updateProductMedia(mediaId: string, mediaData: any): Promise<any> {
+    const [updatedMedia] = await db.update(productMedia)
+      .set({
+        type: mediaData.type,
+        url: mediaData.url,
+        thumbnailUrl: mediaData.thumbnailUrl,
+        alt: mediaData.alt,
+        position: mediaData.position
+      })
+      .where(eq(productMedia.id, mediaId))
+      .returning();
+    
+    return updatedMedia;
+  }
+
+  async deleteProductMedia(mediaId: string): Promise<void> {
+    await db.delete(productMedia).where(eq(productMedia.id, mediaId));
   }
 
   async searchProductsV1(params: {
