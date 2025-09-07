@@ -9,6 +9,7 @@ import { setupAuthRoutes, authenticateToken, requireAdmin } from "./auth-routes"
 import { setupUserRoutes } from "./user-routes";
 import { emailNotificationService } from "./email-service";
 import { setupNotificationRoutes } from "./notification-routes";
+import { setupAdminRoutes } from "./admin-routes";
 
 // Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {
@@ -44,6 +45,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup notification routes
   setupNotificationRoutes(app);
+  
+  // Setup admin routes
+  setupAdminRoutes(app);
 
   // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {
