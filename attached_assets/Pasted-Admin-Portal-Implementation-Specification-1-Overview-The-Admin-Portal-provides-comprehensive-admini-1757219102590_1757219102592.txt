@@ -1,0 +1,347 @@
+Admin Portal Implementation Specification
+1. Overview
+The Admin Portal provides comprehensive administrative functionality for managing users, content, system settings, and monitoring application health.
+2. Authentication & Authorization
+2.1 Admin Authentication
+POST   /api/v1/admin/auth/login
+POST   /api/v1/admin/auth/logout
+POST   /api/v1/admin/auth/refresh
+GET    /api/v1/admin/auth/profile
+PUT    /api/v1/admin/auth/profile
+2.2 Role-Based Access Control
+GET    /api/v1/admin/roles
+POST   /api/v1/admin/roles
+PUT    /api/v1/admin/roles/{roleId}
+DELETE /api/v1/admin/roles/{roleId}
+GET    /api/v1/admin/permissions
+POST   /api/v1/admin/users/{userId}/roles
+DELETE /api/v1/admin/users/{userId}/roles/{roleId}
+3. User Management
+3.1 User Operations
+GET    /api/v1/admin/users
+POST   /api/v1/admin/users
+GET    /api/v1/admin/users/{userId}
+PUT    /api/v1/admin/users/{userId}
+DELETE /api/v1/admin/users/{userId}
+POST   /api/v1/admin/users/{userId}/suspend
+POST   /api/v1/admin/users/{userId}/unsuspend
+POST   /api/v1/admin/users/{userId}/reset-password
+GET    /api/v1/admin/users/{userId}/activity
+GET    /api/v1/admin/users/{userId}/sessions
+DELETE /api/v1/admin/users/{userId}/sessions/{sessionId}
+3.2 Bulk Operations
+POST   /api/v1/admin/users/bulk/import
+POST   /api/v1/admin/users/bulk/export
+POST   /api/v1/admin/users/bulk/update
+POST   /api/v1/admin/users/bulk/delete
+4. Content Management
+4.1 Content Operations
+GET    /api/v1/admin/content
+POST   /api/v1/admin/content
+GET    /api/v1/admin/content/{contentId}
+PUT    /api/v1/admin/content/{contentId}
+DELETE /api/v1/admin/content/{contentId}
+POST   /api/v1/admin/content/{contentId}/publish
+POST   /api/v1/admin/content/{contentId}/unpublish
+GET    /api/v1/admin/content/categories
+POST   /api/v1/admin/content/categories
+4.2 Media Management
+GET    /api/v1/admin/media
+POST   /api/v1/admin/media/upload
+DELETE /api/v1/admin/media/{mediaId}
+GET    /api/v1/admin/media/storage-usage
+5. Analytics & Reporting
+5.1 Dashboard Metrics
+GET    /api/v1/admin/dashboard/overview
+GET    /api/v1/admin/dashboard/user-metrics
+GET    /api/v1/admin/dashboard/content-metrics
+GET    /api/v1/admin/dashboard/system-health
+5.2 Reports
+GET    /api/v1/admin/reports/users
+GET    /api/v1/admin/reports/activity
+GET    /api/v1/admin/reports/performance
+POST   /api/v1/admin/reports/custom
+GET    /api/v1/admin/reports/{reportId}/download
+6. System Management
+6.1 Configuration
+GET    /api/v1/admin/config
+PUT    /api/v1/admin/config
+GET    /api/v1/admin/config/cache
+POST   /api/v1/admin/config/cache/clear
+6.2 System Operations
+GET    /api/v1/admin/system/status
+GET    /api/v1/admin/system/logs
+POST   /api/v1/admin/system/maintenance/enable
+POST   /api/v1/admin/system/maintenance/disable
+GET    /api/v1/admin/system/backups
+POST   /api/v1/admin/system/backups
+7. Audit & Security
+7.1 Audit Logs
+GET    /api/v1/admin/audit/logs
+GET    /api/v1/admin/audit/logs/{logId}
+POST   /api/v1/admin/audit/logs/export
+7.2 Security Monitoring
+GET    /api/v1/admin/security/threats
+GET    /api/v1/admin/security/failed-logins
+POST   /api/v1/admin/security/ip-blacklist
+DELETE /api/v1/admin/security/ip-blacklist/{ip}
+8. Data Models
+8.1 Admin User Model
+json{
+  "AdminUser": {
+    "adminId": "UUID",
+    "username": "string",
+    "email": "string",
+    "passwordHash": "string",
+    "profile": {
+      "firstName": "string",
+      "lastName": "string",
+      "avatarUrl": "string"
+    },
+    "roles": ["string[]"],
+    "permissions": ["string[]"],
+    "security": {
+      "twoFactorEnabled": "boolean",
+      "lastPasswordChange": "timestamp",
+      "lastLoginAt": "timestamp",
+      "loginAttempts": "integer",
+      "accountLocked": "boolean"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "createdBy": "UUID",
+      "isActive": "boolean"
+    }
+  }
+}
+8.2 Role & Permission Model
+json{
+  "Role": {
+    "roleId": "UUID",
+    "name": "string",
+    "description": "string",
+    "permissions": ["string[]"],
+    "isSystem": "boolean",
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
+    }
+  },
+  "Permission": {
+    "permissionId": "UUID",
+    "name": "string",
+    "resource": "string",
+    "action": "enum[create|read|update|delete|manage]",
+    "description": "string"
+  }
+}
+8.3 User Model (Extended)
+json{
+  "User": {
+    "userId": "UUID",
+    "email": "string",
+    "username": "string",
+    "passwordHash": "string",
+    "profile": {
+      "firstName": "string",
+      "lastName": "string",
+      "phoneNumber": "string",
+      "dateOfBirth": "date",
+      "gender": "enum[male|female|other|prefer_not_to_say]",
+      "avatarUrl": "string"
+    },
+    "addresses": [{
+      "addressId": "UUID",
+      "type": "enum[billing|shipping]",
+      "streetAddress": "string",
+      "city": "string",
+      "state": "string",
+      "zipCode": "string",
+      "country": "string",
+      "isDefault": "boolean"
+    }],
+    "preferences": {
+      "language": "string",
+      "currency": "string",
+      "timezone": "string",
+      "notifications": {
+        "email": "boolean",
+        "sms": "boolean",
+        "push": "boolean"
+      }
+    },
+    "security": {
+      "twoFactorEnabled": "boolean",
+      "lastPasswordChange": "timestamp",
+      "loginAttempts": "integer",
+      "accountLocked": "boolean",
+      "suspensionReason": "string",
+      "suspendedAt": "timestamp",
+      "suspendedBy": "UUID"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "lastLoginAt": "timestamp",
+      "lastActivityAt": "timestamp",
+      "emailVerified": "boolean",
+      "phoneVerified": "boolean",
+      "status": "enum[active|suspended|banned|pending]",
+      "source": "string",
+      "tags": ["string[]"]
+    },
+    "statistics": {
+      "totalLogins": "integer",
+      "totalSessions": "integer",
+      "averageSessionDuration": "integer",
+      "lastIpAddress": "string"
+    }
+  }
+}
+8.4 Content Model
+json{
+  "Content": {
+    "contentId": "UUID",
+    "title": "string",
+    "slug": "string",
+    "type": "enum[article|page|product|media]",
+    "status": "enum[draft|published|archived]",
+    "content": {
+      "body": "string",
+      "excerpt": "string",
+      "featuredImage": "string",
+      "metadata": "object"
+    },
+    "seo": {
+      "metaTitle": "string",
+      "metaDescription": "string",
+      "keywords": ["string[]"]
+    },
+    "categories": ["UUID[]"],
+    "tags": ["string[]"],
+    "author": {
+      "userId": "UUID",
+      "name": "string"
+    },
+    "publishing": {
+      "publishedAt": "timestamp",
+      "scheduledAt": "timestamp",
+      "expiresAt": "timestamp"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "createdBy": "UUID",
+      "updatedBy": "UUID",
+      "version": "integer",
+      "viewCount": "integer"
+    }
+  }
+}
+8.5 System Configuration Model
+json{
+  "SystemConfig": {
+    "configId": "UUID",
+    "category": "string",
+    "key": "string",
+    "value": "any",
+    "type": "enum[string|number|boolean|object|array]",
+    "description": "string",
+    "isPublic": "boolean",
+    "validation": {
+      "required": "boolean",
+      "pattern": "string",
+      "min": "number",
+      "max": "number"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "updatedBy": "UUID"
+    }
+  }
+}
+8.6 Audit Log Model
+json{
+  "AuditLog": {
+    "logId": "UUID",
+    "action": "string",
+    "resource": "string",
+    "resourceId": "UUID",
+    "actor": {
+      "actorId": "UUID",
+      "actorType": "enum[admin|user|system]",
+      "actorName": "string"
+    },
+    "changes": {
+      "before": "object",
+      "after": "object"
+    },
+    "context": {
+      "ipAddress": "string",
+      "userAgent": "string",
+      "sessionId": "UUID"
+    },
+    "metadata": {
+      "timestamp": "timestamp",
+      "severity": "enum[low|medium|high|critical]",
+      "category": "string"
+    }
+  }
+}
+9. Response Formats
+9.1 Standard API Response
+json{
+  "success": "boolean",
+  "data": "any",
+  "message": "string",
+  "errors": ["string[]"],
+  "meta": {
+    "timestamp": "timestamp",
+    "requestId": "UUID",
+    "pagination": {
+      "page": "integer",
+      "limit": "integer",
+      "total": "integer",
+      "totalPages": "integer"
+    }
+  }
+}
+9.2 Error Response
+json{
+  "success": false,
+  "error": {
+    "code": "string",
+    "message": "string",
+    "details": "object"
+  },
+  "meta": {
+    "timestamp": "timestamp",
+    "requestId": "UUID"
+  }
+}
+10. Security Considerations
+10.1 Authentication Requirements
+
+JWT tokens with short expiration (15 minutes)
+Refresh tokens with longer expiration (7 days)
+Two-factor authentication mandatory for admin accounts
+Rate limiting on all endpoints
+IP whitelisting for admin access
+
+10.2 Permission Levels
+
+Super Admin: Full system access
+Admin: User and content management
+Moderator: Content moderation only
+Analyst: Read-only analytics access
+Support: User support functions only
+
+10.3 Data Protection
+
+All sensitive data encrypted at rest
+Audit logging for all admin actions
+Regular security scans and updates
+Data retention policies implemented
+GDPR/privacy compliance features
