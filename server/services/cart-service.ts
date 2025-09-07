@@ -1,5 +1,6 @@
 import { eq, and, sql, desc } from "drizzle-orm";
 import { db } from "../db";
+import WebSocketService from "./websocket-service";
 import { 
   carts, 
   enhancedCartItems, 

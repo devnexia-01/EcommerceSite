@@ -18,6 +18,7 @@ import { emailNotificationService } from "./email-service";
 import { setupNotificationRoutes } from "./notification-routes";
 import { setupAdminRoutes } from "./admin-routes";
 import { setupV1Routes } from "./v1-routes";
+import WebSocketService from "./services/websocket-service";
 
 // Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {
@@ -463,5 +464,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // Initialize WebSocket service for real-time cart updates
+  WebSocketService.getInstance(httpServer);
+  
   return httpServer;
 }
