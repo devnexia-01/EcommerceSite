@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import cartV1Routes from "./routes/cart-v1";
 import { storage } from "./storage";
 import { productService } from "./product-service";
 import { brandService } from "./brand-service";
@@ -21,6 +22,9 @@ import {
 import { z } from "zod";
 
 export function setupV1Routes(app: any, storage: any) {
+  
+  // ===== Enhanced Cart Service Endpoints =====
+  app.use("/api/v1/cart", cartV1Routes);
   
   // ===== Product Management Endpoints =====
   
