@@ -1832,3 +1832,350 @@ export type InsertShipment = z.infer<typeof insertShipmentSchema>;
 
 export type ShipmentItem = typeof shipmentItems.$inferSelect;
 export type InsertShipmentItem = z.infer<typeof insertShipmentItemSchema>;
+
+// ============ PAYMENT SYSTEM MODELS ============
+
+// Payment Methods table
+export const paymentMethods = pgTable("payment_methods", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  type: text("type").notNull(), // credit_card|debit_card|paypal|apple_pay|google_pay|bank_account
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  
+  // Card details
+  card: jsonb("card").$type<{
+    last4: string;
+    brand: string; // visa|mastercard|amex|discover|jcb|diners
+    expiryMonth: number;
+    expiryYear: number;
+    holderName: string;
+    fingerprint?: string;
+    issuer?: string;
+    country?: string;
+    fundingType?: string; // credit|debit|prepaid|unknown
+  }>(),
+  
+  // Billing address
+  billingAddress: jsonb("billing_address").$type<{
+    firstName: string;
+    lastName: string;
+    streetAddress: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  }>(),
+  
+  // Gateway information
+  gateway: jsonb("gateway").$type<{
+    provider: string;
+    customerId: string;
+    tokenId: string;
+  }>(),
+  
+  // Verification
+  verification: jsonb("verification").$type<{
+    verified: boolean;
+    verifiedAt?: string;
+    verificationMethod?: string;
+  }>(),
+  
+  // Metadata
+  lastUsed: timestamp("last_used"),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Payment Transactions table
+export const paymentTransactions = pgTable("payment_transactions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  type: text("type").notNull(), // payment|refund|authorization|capture|void
+  status: text("status").notNull(), // pending|processing|success|failed|cancelled|expired
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("USD"),
+  gateway: text("gateway").notNull(), // stripe|paypal|square|authorize_net|braintree
+  gatewayTransactionId: text("gateway_transaction_id"),
+  
+  // Payment method used
+  paymentMethod: jsonb("payment_method").$type<{
+    methodId: string;
+    type: string;
+    last4?: string;
+    brand?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
+  }>(),
+  
+  // Fees
+  fees: jsonb("fees").$type<{
+    processingFee: string;
+    gatewayFee: string;
+    totalFee: string;
+  }>(),
+  
+  // Fraud detection
+  fraud: jsonb("fraud").$type<{
+    riskScore: string;
+    status: string; // passed|flagged|blocked
+    checks: {
+      cvv: string; // pass|fail|unavailable
+      address: string; // pass|fail|unavailable
+      postal: string; // pass|fail|unavailable
+    };
+  }>(),
+  
+  // Metadata
+  failureReason: text("failure_reason"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Refunds table
+export const refunds = pgTable("refunds", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalTransactionId: uuid("original_transaction_id").references(() => paymentTransactions.id).notNull(),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("USD"),
+  reason: text("reason").notNull(), // requested_by_customer|duplicate|fraudulent|subscription_cancellation|other
+  status: text("status").notNull(), // pending|processing|succeeded|failed|cancelled
+  type: text("type").notNull(), // full|partial
+  
+  // Gateway information
+  gateway: jsonb("gateway").$type<{
+    provider: string;
+    refundId: string;
+    fee: string;
+  }>(),
+  
+  // Timeline
+  timeline: jsonb("timeline").$type<Array<{
+    status: string;
+    timestamp: string;
+    note?: string;
+  }>>(),
+  
+  // Metadata
+  requestedBy: uuid("requested_by").references(() => users.id),
+  failureReason: text("failure_reason"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// 3D Secure Authentication table
+export const threeDSecure = pgTable("three_d_secure", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: uuid("transaction_id").references(() => paymentTransactions.id).notNull(),
+  status: text("status").notNull(), // required|authenticated|failed|bypassed|unavailable
+  version: text("version"), // 1.0|2.0|2.1|2.2
+  authenticationValue: text("authentication_value"),
+  cavv: text("cavv"),
+  eci: text("eci"),
+  dsTransId: text("ds_trans_id"),
+  acsTransId: text("acs_trans_id"),
+  challengeRequired: boolean("challenge_required").default(false),
+  liabilityShift: boolean("liability_shift").default(false),
+  enrollmentStatus: text("enrollment_status"), // Y|N|U
+  authenticationStatus: text("authentication_status"), // Y|N|U|A|C|R
+  redirectUrl: text("redirect_url"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").default(sql`now()`)
+});
+
+// Wallet Payments table
+export const walletPayments = pgTable("wallet_payments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: uuid("transaction_id").references(() => paymentTransactions.id).notNull(),
+  walletType: text("wallet_type").notNull(), // apple_pay|google_pay|samsung_pay|paypal
+  
+  // Device data
+  deviceData: jsonb("device_data").$type<{
+    deviceId: string;
+    merchantId: string;
+    paymentData: string;
+    signature: string;
+  }>(),
+  
+  // Billing contact
+  billingContact: jsonb("billing_contact").$type<{
+    name: string;
+    email: string;
+    phone: string;
+  }>(),
+  
+  // Shipping contact
+  shippingContact: jsonb("shipping_contact").$type<{
+    name: string;
+    email: string;
+    phone: string;
+    address: any;
+  }>(),
+  
+  // Verification
+  verification: jsonb("verification").$type<{
+    status: string; // verified|failed|pending
+    method: string;
+    timestamp: string;
+  }>(),
+  
+  createdAt: timestamp("created_at").default(sql`now()`)
+});
+
+// Payment Gateway Configuration table
+export const paymentGateways = pgTable("payment_gateways", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(), // stripe|paypal|square|authorize_net|braintree
+  environment: text("environment").notNull(), // sandbox|production
+  isActive: boolean("is_active").default(true),
+  
+  // Configuration
+  configuration: jsonb("configuration").$type<{
+    merchantId: string;
+    publicKey: string;
+    webhookUrl: string;
+    supportedMethods: string[];
+    supportedCurrencies: string[];
+  }>(),
+  
+  // Limits
+  limits: jsonb("limits").$type<{
+    minAmount: string;
+    maxAmount: string;
+    dailyLimit: string;
+    monthlyLimit: string;
+  }>(),
+  
+  // Fees
+  fees: jsonb("fees").$type<{
+    percentage: string;
+    fixed: string;
+    internationalFee: string;
+  }>(),
+  
+  lastHealthCheck: timestamp("last_health_check"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// ============ PAYMENT SYSTEM RELATIONS ============
+
+export const paymentMethodsRelations = relations(paymentMethods, ({ one, many }) => ({
+  user: one(users, {
+    fields: [paymentMethods.userId],
+    references: [users.id],
+  }),
+  transactions: many(paymentTransactions),
+}));
+
+export const paymentTransactionsRelations = relations(paymentTransactions, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [paymentTransactions.orderId],
+    references: [orders.id],
+  }),
+  user: one(users, {
+    fields: [paymentTransactions.userId],
+    references: [users.id],
+  }),
+  refunds: many(refunds),
+  threeDSecure: one(threeDSecure),
+  walletPayment: one(walletPayments),
+}));
+
+export const refundsRelations = relations(refunds, ({ one }) => ({
+  originalTransaction: one(paymentTransactions, {
+    fields: [refunds.originalTransactionId],
+    references: [paymentTransactions.id],
+  }),
+  order: one(orders, {
+    fields: [refunds.orderId],
+    references: [orders.id],
+  }),
+  requestedByUser: one(users, {
+    fields: [refunds.requestedBy],
+    references: [users.id],
+  }),
+}));
+
+export const threeDSecureRelations = relations(threeDSecure, ({ one }) => ({
+  transaction: one(paymentTransactions, {
+    fields: [threeDSecure.transactionId],
+    references: [paymentTransactions.id],
+  }),
+}));
+
+export const walletPaymentsRelations = relations(walletPayments, ({ one }) => ({
+  transaction: one(paymentTransactions, {
+    fields: [walletPayments.transactionId],
+    references: [paymentTransactions.id],
+  }),
+}));
+
+// ============ PAYMENT SYSTEM SCHEMAS ============
+
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsed: true,
+  usageCount: true
+});
+
+export const insertPaymentTransactionSchema = createInsertSchema(paymentTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  processedAt: true
+});
+
+export const insertRefundSchema = createInsertSchema(refunds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  processedAt: true
+});
+
+export const insertThreeDSecureSchema = createInsertSchema(threeDSecure).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true
+});
+
+export const insertWalletPaymentSchema = createInsertSchema(walletPayments).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertPaymentGatewaySchema = createInsertSchema(paymentGateways).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastHealthCheck: true
+});
+
+// ============ PAYMENT SYSTEM TYPES ============
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+export type InsertPaymentTransaction = z.infer<typeof insertPaymentTransactionSchema>;
+
+export type Refund = typeof refunds.$inferSelect;
+export type InsertRefund = z.infer<typeof insertRefundSchema>;
+
+export type ThreeDSecure = typeof threeDSecure.$inferSelect;
+export type InsertThreeDSecure = z.infer<typeof insertThreeDSecureSchema>;
+
+export type WalletPayment = typeof walletPayments.$inferSelect;
+export type InsertWalletPayment = z.infer<typeof insertWalletPaymentSchema>;
+
+export type PaymentGateway = typeof paymentGateways.$inferSelect;
+export type InsertPaymentGateway = z.infer<typeof insertPaymentGatewaySchema>;
