@@ -28,6 +28,11 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
+// Test route to verify integration
+router.get("/test", (req: AuthenticatedRequest, res: Response) => {
+  res.json({ message: "Order management routes loaded successfully!" });
+});
+
 // Helper function to generate order number
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString();

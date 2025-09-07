@@ -69,9 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: contentRoutes } = await import("./content-routes.js");
   app.use("/api/content", contentRoutes);
   
-  // Setup order management routes
-  const { orderManagementRoutes } = await import("./order-management-routes.js");
-  app.use("/api/v1", orderManagementRoutes);
+  // Order management routes are integrated into v1-routes.ts
 
   // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {
