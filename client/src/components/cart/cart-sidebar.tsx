@@ -33,32 +33,6 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
   const tax = subtotal * 0.08; // 8% tax
   const total = subtotal + shipping + tax;
 
-  if (!isAuthenticated) {
-    return (
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent className="w-full sm:w-96 max-w-md flex flex-col" data-testid="cart-sidebar">
-          <SheetHeader>
-            <SheetTitle className="flex items-center justify-between">
-              Shopping Cart
-              <Button variant="ghost" size="icon" onClick={onClose} data-testid="close-cart">
-                <X className="h-4 w-4" />
-              </Button>
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-muted-foreground mb-4">Please login to view your cart</p>
-              <Button asChild data-testid="login-to-view-cart">
-                <Link href="/login" onClick={onClose}>Login</Link>
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="w-full sm:w-96 max-w-md flex flex-col" data-testid="cart-sidebar">
