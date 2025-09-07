@@ -64,6 +64,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup wishlist routes
   const { default: wishlistRoutes } = await import("./wishlist-routes.js");
   app.use("/api/wishlists", wishlistRoutes);
+  
+  // Setup content routes (footer links, contact, support, etc.)
+  const { default: contentRoutes } = await import("./content-routes.js");
+  app.use("/api/content", contentRoutes);
 
   // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {

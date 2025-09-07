@@ -292,6 +292,147 @@ export class EmailNotificationService {
 
     await this.sendNotification('productRecommendation', user.email, context, settings);
   }
+
+  // Send contact form submission
+  async sendContactForm(
+    userEmail: string,
+    userName: string,
+    subject: string,
+    message: string,
+    category: string,
+    phone?: string
+  ): Promise<void> {
+    if (!isEmailEnabled) {
+      console.log(`Would send contact form email: ${subject} from ${userEmail}`);
+      return;
+    }
+
+    try {
+      const msg = {
+        to: 'support@elitecommerce.com',
+        from: process.env.FROM_EMAIL || 'noreply@elitecommerce.com',
+        replyTo: userEmail,
+        subject: `Contact Form: ${subject}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">New Contact Form Submission</h2>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>From:</strong> ${userName} (${userEmail})</p>
+              ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
+              <p><strong>Category:</strong> ${category}</p>
+              <p><strong>Subject:</strong> ${subject}</p>
+              <div style="margin-top: 15px;">
+                <strong>Message:</strong>
+                <div style="background: white; padding: 15px; margin-top: 5px; border-left: 4px solid #007bff;">
+                  ${message.replace(/\n/g, '<br>')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `,
+        text: `Contact Form Submission\nFrom: ${userName} (${userEmail})\n${phone ? `Phone: ${phone}\n` : ''}Category: ${category}\nSubject: ${subject}\n\nMessage:\n${message}`
+      };
+
+      await sgMail.send(msg);
+    } catch (error) {
+      console.error('Error sending contact form email:', error);
+      throw error;
+    }
+  }
+
+  // Send support ticket
+  async sendSupportTicket(
+    userEmail: string,
+    userName: string,
+    subject: string,
+    message: string,
+    category: string,
+    priority: string,
+    ticketId: string,
+    orderNumber?: string
+  ): Promise<void> {
+    if (!isEmailEnabled) {
+      console.log(`Would send support ticket email: ${ticketId}`);
+      return;
+    }
+
+    try {
+      const msg = {
+        to: 'support@elitecommerce.com',
+        from: process.env.FROM_EMAIL || 'noreply@elitecommerce.com',
+        replyTo: userEmail,
+        subject: `[${priority.toUpperCase()}] Support Ticket #${ticketId}: ${subject}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">New Support Ticket</h2>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Ticket ID:</strong> #${ticketId}</p>
+              <p><strong>Priority:</strong> <span style="background: ${priority === 'urgent' ? '#dc3545' : priority === 'high' ? '#fd7e14' : priority === 'medium' ? '#ffc107' : '#28a745'}; color: white; padding: 2px 8px; border-radius: 4px;">${priority.toUpperCase()}</span></p>
+              <p><strong>From:</strong> ${userName} (${userEmail})</p>
+              <p><strong>Category:</strong> ${category}</p>
+              ${orderNumber ? `<p><strong>Order Number:</strong> ${orderNumber}</p>` : ''}
+              <p><strong>Subject:</strong> ${subject}</p>
+              <div style="margin-top: 15px;">
+                <strong>Message:</strong>
+                <div style="background: white; padding: 15px; margin-top: 5px; border-left: 4px solid #007bff;">
+                  ${message.replace(/\n/g, '<br>')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `,
+        text: `Support Ticket #${ticketId}\nPriority: ${priority.toUpperCase()}\nFrom: ${userName} (${userEmail})\nCategory: ${category}\n${orderNumber ? `Order: ${orderNumber}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`
+      };
+
+      await sgMail.send(msg);
+    } catch (error) {
+      console.error('Error sending support ticket email:', error);
+      throw error;
+    }
+  }
+
+  // Send newsletter welcome email
+  async sendNewsletterWelcome(userEmail: string, userName: string): Promise<void> {
+    if (!isEmailEnabled) {
+      console.log(`Would send newsletter welcome email to: ${userEmail}`);
+      return;
+    }
+
+    try {
+      const msg = {
+        to: userEmail,
+        from: process.env.FROM_EMAIL || 'noreply@elitecommerce.com',
+        subject: 'Welcome to EliteCommerce Newsletter!',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #333;">Welcome to Our Newsletter!</h1>
+            <p>Hi ${userName},</p>
+            <p>Thank you for subscribing to the EliteCommerce newsletter! You're now part of our exclusive community.</p>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3>What you can expect:</h3>
+              <ul style="color: #666;">
+                <li>🎉 Exclusive deals and early access to sales</li>
+                <li>📦 New product announcements</li>
+                <li>💡 Style tips and shopping guides</li>
+                <li>🎁 Special birthday and anniversary offers</li>
+              </ul>
+            </div>
+            
+            <p>We promise to keep your inbox interesting and never spam you. You can unsubscribe at any time.</p>
+            <p>Happy shopping!</p>
+            <p>The EliteCommerce Team</p>
+          </div>
+        `,
+        text: `Welcome to EliteCommerce Newsletter!\n\nHi ${userName},\n\nThank you for subscribing! You'll receive exclusive deals, new product announcements, style tips, and special offers.\n\nHappy shopping!\nThe EliteCommerce Team`
+      };
+
+      await sgMail.send(msg);
+    } catch (error) {
+      console.error('Error sending newsletter welcome email:', error);
+      throw error;
+    }
+  }
 }
 
 export const emailNotificationService = new EmailNotificationService();

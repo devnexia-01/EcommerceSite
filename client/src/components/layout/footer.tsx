@@ -2,11 +2,60 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function Footer() {
-  const handleNewsletterSubscribe = (e: React.FormEvent) => {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleNewsletterSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement newsletter subscription
+    
+    if (!email.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch('/api/content/newsletter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email.trim() })
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Successfully subscribed!",
+          description: "Thank you for subscribing to our newsletter"
+        });
+        setEmail("");
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Subscription failed",
+          description: errorData.message || "Please try again later",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to subscribe. Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -67,15 +116,19 @@ export default function Footer() {
               <Input
                 type="email"
                 placeholder="Your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/60 h-12 rounded-lg"
                 data-testid="newsletter-email"
+                disabled={isSubmitting}
               />
               <Button 
                 type="submit"
                 className="w-full furniture-btn-secondary bg-accent hover:bg-accent text-accent-foreground h-12"
                 data-testid="newsletter-subscribe"
+                disabled={isSubmitting}
               >
-                Subscribe
+                {isSubmitting ? "Subscribing..." : "Subscribe"}
               </Button>
             </form>
           </div>
