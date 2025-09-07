@@ -265,7 +265,103 @@ export const loginSessions = pgTable("login_sessions", {
   createdAt: timestamp("created_at").default(sql`now()`)
 });
 
-// Cart items table
+// Enhanced Cart table - Main cart entity
+export const carts = pgTable("carts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`), // cartId
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  sessionId: text("session_id"), // For guest carts
+  
+  // Summary calculations
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0"),
+  tax: decimal("tax", { precision: 10, scale: 2 }).default("0"),
+  shipping: decimal("shipping", { precision: 10, scale: 2 }).default("0"),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).default("0"),
+  
+  // Metadata
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  expiresAt: timestamp("expires_at"), // Cart expiration
+  abandoned: boolean("abandoned").default(false),
+  
+  // Additional fields
+  currency: text("currency").default("USD"),
+  notes: text("notes")
+});
+
+// Enhanced Cart Items table
+export const enhancedCartItems = pgTable("enhanced_cart_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`), // itemId
+  cartId: uuid("cart_id").references(() => carts.id, { onDelete: "cascade" }).notNull(),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  variantId: uuid("variant_id"), // For product variants
+  quantity: integer("quantity").notNull().default(1),
+  
+  // Pricing at time of adding to cart
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  
+  // Customization options
+  customization: jsonb("customization").$type<{
+    engraving?: string;
+    giftWrap?: boolean;
+    giftMessage?: string;
+    color?: string;
+    size?: string;
+    [key: string]: any;
+  }>(),
+  
+  // Metadata
+  addedAt: timestamp("added_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  
+  // Save for later functionality
+  savedForLater: boolean("saved_for_later").default(false),
+  savedAt: timestamp("saved_at")
+});
+
+// Coupons table
+export const coupons = pgTable("coupons", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // Discount configuration
+  type: text("type").notNull(), // percentage, fixed, free_shipping
+  value: decimal("value", { precision: 10, scale: 2 }).notNull(),
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }),
+  maxDiscount: decimal("max_discount", { precision: 10, scale: 2 }),
+  
+  // Usage limits
+  usageLimit: integer("usage_limit"), // null = unlimited
+  usedCount: integer("used_count").default(0),
+  userUsageLimit: integer("user_usage_limit"), // per user limit
+  
+  // Validity
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  active: boolean("active").default(true),
+  
+  // Restrictions
+  applicableProducts: jsonb("applicable_products").$type<string[]>(),
+  applicableCategories: jsonb("applicable_categories").$type<string[]>(),
+  excludeProducts: jsonb("exclude_products").$type<string[]>(),
+  
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Cart Coupons junction table
+export const cartCoupons = pgTable("cart_coupons", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  cartId: uuid("cart_id").references(() => carts.id, { onDelete: "cascade" }).notNull(),
+  couponId: uuid("coupon_id").references(() => coupons.id, { onDelete: "cascade" }).notNull(),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull(),
+  appliedAt: timestamp("applied_at").default(sql`now()`)
+});
+
+// Legacy Cart items table (keep for backward compatibility)
 export const cartItems = pgTable("cart_items", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
@@ -323,6 +419,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   settings: one(userSettings),
   addresses: many(addresses),
   cartItems: many(cartItems),
+  carts: many(carts),
   orders: many(orders),
   reviews: many(reviews),
   refreshTokens: many(refreshTokens),
@@ -415,6 +512,43 @@ export const loginSessionsRelations = relations(loginSessions, ({ one }) => ({
   })
 }));
 
+// Enhanced Cart Relations
+export const cartsRelations = relations(carts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [carts.userId],
+    references: [users.id]
+  }),
+  items: many(enhancedCartItems),
+  coupons: many(cartCoupons)
+}));
+
+export const enhancedCartItemsRelations = relations(enhancedCartItems, ({ one }) => ({
+  cart: one(carts, {
+    fields: [enhancedCartItems.cartId],
+    references: [carts.id]
+  }),
+  product: one(products, {
+    fields: [enhancedCartItems.productId],
+    references: [products.id]
+  })
+}));
+
+export const couponsRelations = relations(coupons, ({ many }) => ({
+  cartCoupons: many(cartCoupons)
+}));
+
+export const cartCouponsRelations = relations(cartCoupons, ({ one }) => ({
+  cart: one(carts, {
+    fields: [cartCoupons.cartId],
+    references: [carts.id]
+  }),
+  coupon: one(coupons, {
+    fields: [cartCoupons.couponId],
+    references: [coupons.id]
+  })
+}));
+
+// Legacy cart items relations
 export const cartItemsRelations = relations(cartItems, ({ one }) => ({
   user: one(users, {
     fields: [cartItems.userId],
@@ -530,6 +664,32 @@ export const insertAddressSchema = createInsertSchema(addresses).omit({
   updatedAt: true
 });
 
+// Enhanced Cart Insert Schemas
+export const insertCartSchema = createInsertSchema(carts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertEnhancedCartItemSchema = createInsertSchema(enhancedCartItems).omit({
+  id: true,
+  addedAt: true,
+  updatedAt: true
+});
+
+export const insertCouponSchema = createInsertSchema(coupons).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  usedCount: true
+});
+
+export const insertCartCouponSchema = createInsertSchema(cartCoupons).omit({
+  id: true,
+  appliedAt: true
+});
+
+// Legacy cart item schema (backward compatibility)
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({
   id: true,
   createdAt: true
