@@ -13,6 +13,7 @@ import {
   insertShipmentItemSchema, insertReviewSchema
 } from "@shared/schema";
 import { eq, desc, and, sql, or } from "drizzle-orm";
+import { authenticateToken } from "./auth-routes";
 
 // Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {
@@ -24,14 +25,6 @@ interface AuthenticatedRequest extends Request {
     username?: string;
   };
 }
-
-// Middleware to require authentication
-const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  next();
-};
 
 const router = Router();
 
@@ -88,7 +81,7 @@ async function addOrderStatusHistory(
 }
 
 // 1. POST /api/v1/orders - Create new order
-router.post("/orders", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.userId || req.user?.id;
     if (!userId) {
@@ -143,7 +136,7 @@ router.post("/orders", requireAuth, async (req: AuthenticatedRequest, res: Respo
 });
 
 // 2. GET /api/v1/orders/{orderId} - Get specific order
-router.get("/orders/:orderId", requireAuth, async (req, res) => {
+router.get("/orders/:orderId", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
@@ -201,7 +194,7 @@ router.get("/orders/:orderId", requireAuth, async (req, res) => {
 });
 
 // 3. GET /api/v1/orders/user/{userId} - Get orders for a user
-router.get("/orders/user/:userId", requireAuth, async (req, res) => {
+router.get("/orders/user/:userId", authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user?.id;
@@ -236,7 +229,7 @@ router.get("/orders/user/:userId", requireAuth, async (req, res) => {
 });
 
 // 4. PUT /api/v1/orders/{orderId}/status - Update order status
-router.put("/orders/:orderId/status", requireAuth, async (req, res) => {
+router.put("/orders/:orderId/status", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status, reason, notes } = req.body;
@@ -296,7 +289,7 @@ router.put("/orders/:orderId/status", requireAuth, async (req, res) => {
 });
 
 // 5. POST /api/v1/orders/{orderId}/cancel - Cancel order
-router.post("/orders/:orderId/cancel", requireAuth, async (req, res) => {
+router.post("/orders/:orderId/cancel", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { reason, notes } = req.body;
@@ -353,7 +346,7 @@ router.post("/orders/:orderId/cancel", requireAuth, async (req, res) => {
 });
 
 // 6. POST /api/v1/orders/{orderId}/return - Create return request
-router.post("/orders/:orderId/return", requireAuth, async (req, res) => {
+router.post("/orders/:orderId/return", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
@@ -411,7 +404,7 @@ router.post("/orders/:orderId/return", requireAuth, async (req, res) => {
 });
 
 // 7. GET /api/v1/orders/{orderId}/invoice - Get order invoice
-router.get("/orders/:orderId/invoice", requireAuth, async (req, res) => {
+router.get("/orders/:orderId/invoice", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
@@ -530,7 +523,7 @@ router.get("/orders/:orderId/invoice", requireAuth, async (req, res) => {
 });
 
 // 8. GET /api/v1/orders/{orderId}/tracking - Get order tracking
-router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
+router.get("/orders/:orderId/tracking", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
@@ -570,7 +563,7 @@ router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
 });
 
 // 9. POST /api/v1/orders/{orderId}/review - Create order review
-router.post("/orders/:orderId/review", requireAuth, async (req, res) => {
+router.post("/orders/:orderId/review", authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
