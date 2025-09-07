@@ -1,4 +1,13 @@
 import { Request, Response } from "express";
+
+// Extend Request type to include user
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    isAdmin: boolean;
+  };
+}
 import { db } from "./db";
 import { 
   paymentMethods, 
@@ -92,7 +101,7 @@ const stripeService = new MockStripeService();
 
 // Payment Processing Endpoints
 
-export async function processPayment(req: Request, res: Response) {
+export async function processPayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { orderId, paymentMethodId, amount, currency = "USD" } = req.body;
     const userId = req.user?.id;
@@ -196,7 +205,7 @@ export async function processPayment(req: Request, res: Response) {
   }
 }
 
-export async function authorizePayment(req: Request, res: Response) {
+export async function authorizePayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { orderId, paymentMethodId, amount, currency = "USD" } = req.body;
     const userId = req.user?.id;
@@ -280,7 +289,7 @@ export async function authorizePayment(req: Request, res: Response) {
   }
 }
 
-export async function capturePayment(req: Request, res: Response) {
+export async function capturePayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId } = req.params;
     const { amount } = req.body;
@@ -354,7 +363,7 @@ export async function capturePayment(req: Request, res: Response) {
   }
 }
 
-export async function refundPayment(req: Request, res: Response) {
+export async function refundPayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId, amount, reason = "requested_by_customer" } = req.body;
     const userId = req.user?.id;
@@ -447,7 +456,7 @@ export async function refundPayment(req: Request, res: Response) {
   }
 }
 
-export async function getTransaction(req: Request, res: Response) {
+export async function getTransaction(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId } = req.params;
     const userId = req.user?.id;
@@ -480,7 +489,7 @@ export async function getTransaction(req: Request, res: Response) {
 
 // Payment Methods Management
 
-export async function createPaymentMethod(req: Request, res: Response) {
+export async function createPaymentMethod(req: AuthenticatedRequest, res: Response) {
   try {
     const { 
       type, 
@@ -556,7 +565,7 @@ export async function createPaymentMethod(req: Request, res: Response) {
   }
 }
 
-export async function getUserPaymentMethods(req: Request, res: Response) {
+export async function getUserPaymentMethods(req: AuthenticatedRequest, res: Response) {
   try {
     const { userId: requestedUserId } = req.params;
     const currentUserId = req.user?.id;
@@ -601,7 +610,7 @@ export async function getUserPaymentMethods(req: Request, res: Response) {
   }
 }
 
-export async function deletePaymentMethod(req: Request, res: Response) {
+export async function deletePaymentMethod(req: AuthenticatedRequest, res: Response) {
   try {
     const { methodId } = req.params;
     const userId = req.user?.id;
@@ -657,7 +666,7 @@ export async function deletePaymentMethod(req: Request, res: Response) {
 
 // 3D Secure Authentication
 
-export async function process3DSecure(req: Request, res: Response) {
+export async function process3DSecure(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId, returnUrl } = req.body;
     const userId = req.user?.id;
@@ -715,7 +724,7 @@ export async function process3DSecure(req: Request, res: Response) {
 
 // Wallet Payments
 
-export async function processApplePay(req: Request, res: Response) {
+export async function processApplePay(req: AuthenticatedRequest, res: Response) {
   try {
     const { 
       orderId, 
@@ -735,9 +744,42 @@ export async function processApplePay(req: Request, res: Response) {
       return res.status(404).json({ error: "Order not found" });
     }
 
+    // Create a temporary transaction record first to get ID
+    const [tempTransaction] = await db.insert(paymentTransactions).values({
+      orderId,
+      userId,
+      type: "payment",
+      status: "pending",
+      amount: order.total,
+      currency: order.currency,
+      gateway: "stripe",
+      gatewayTransactionId: "temp_pending",
+      paymentMethod: {
+        methodId: "temp",
+        type: "apple_pay",
+        brand: "apple_pay"
+      },
+      fees: {
+        processingFee: "0.30",
+        gatewayFee: (parseFloat(order.total) * 0.029).toFixed(2),
+        totalFee: (parseFloat(order.total) * 0.029 + 0.30).toFixed(2)
+      },
+      fraud: {
+        riskScore: "10",
+        status: "passed",
+        checks: {
+          cvv: "pass",
+          address: "pass",
+          postal: "pass"
+        }
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || ""
+    }).returning();
+
     // Create wallet payment record
     const [walletPayment] = await db.insert(walletPayments).values({
-      transactionId: null, // Will be updated after transaction creation
+      transactionId: tempTransaction.id,
       walletType: "apple_pay",
       deviceData: {
         deviceId: `device_${nanoid()}`,
@@ -765,44 +807,20 @@ export async function processApplePay(req: Request, res: Response) {
       amount: Math.round(parseFloat(order.total) * 100)
     });
 
-    // Create transaction record
-    const [transaction] = await db.insert(paymentTransactions).values({
-      orderId,
-      userId,
-      type: "payment",
-      status: confirmedPayment.status === 'succeeded' ? "success" : "failed",
-      amount: order.total,
-      currency: order.currency,
-      gateway: "stripe",
-      gatewayTransactionId: confirmedPayment.id,
-      paymentMethod: {
-        methodId: walletPayment.id,
-        type: "apple_pay",
-        brand: "apple_pay"
-      },
-      fees: {
-        processingFee: "0.30",
-        gatewayFee: (parseFloat(order.total) * 0.029).toFixed(2),
-        totalFee: (parseFloat(order.total) * 0.029 + 0.30).toFixed(2)
-      },
-      fraud: {
-        riskScore: "10", // Apple Pay has low fraud risk
-        status: "passed",
-        checks: {
-          cvv: "pass",
-          address: "pass",
-          postal: "pass"
-        }
-      },
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent') || "",
-      processedAt: new Date()
-    }).returning();
-
-    // Update wallet payment with transaction ID
-    await db.update(walletPayments)
-      .set({ transactionId: transaction.id })
-      .where(eq(walletPayments.id, walletPayment.id));
+    // Update the transaction record with real payment data
+    const [transaction] = await db.update(paymentTransactions)
+      .set({
+        status: confirmedPayment.status === 'succeeded' ? "success" : "failed",
+        gatewayTransactionId: confirmedPayment.id,
+        paymentMethod: {
+          methodId: walletPayment.id,
+          type: "apple_pay",
+          brand: "apple_pay"
+        },
+        processedAt: new Date()
+      })
+      .where(eq(paymentTransactions.id, tempTransaction.id))
+      .returning();
 
     // Update order status
     if (confirmedPayment.status === 'succeeded') {
@@ -828,7 +846,7 @@ export async function processApplePay(req: Request, res: Response) {
   }
 }
 
-export async function processGooglePay(req: Request, res: Response) {
+export async function processGooglePay(req: AuthenticatedRequest, res: Response) {
   try {
     const { 
       orderId, 
@@ -848,9 +866,42 @@ export async function processGooglePay(req: Request, res: Response) {
       return res.status(404).json({ error: "Order not found" });
     }
 
+    // Create a temporary transaction record first to get ID
+    const [tempTransaction] = await db.insert(paymentTransactions).values({
+      orderId,
+      userId,
+      type: "payment",
+      status: "pending",
+      amount: order.total,
+      currency: order.currency,
+      gateway: "stripe",
+      gatewayTransactionId: "temp_pending",
+      paymentMethod: {
+        methodId: "temp",
+        type: "google_pay",
+        brand: "google_pay"
+      },
+      fees: {
+        processingFee: "0.30",
+        gatewayFee: (parseFloat(order.total) * 0.029).toFixed(2),
+        totalFee: (parseFloat(order.total) * 0.029 + 0.30).toFixed(2)
+      },
+      fraud: {
+        riskScore: "15",
+        status: "passed",
+        checks: {
+          cvv: "pass",
+          address: "pass",
+          postal: "pass"
+        }
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || ""
+    }).returning();
+
     // Create wallet payment record
     const [walletPayment] = await db.insert(walletPayments).values({
-      transactionId: null, // Will be updated after transaction creation
+      transactionId: tempTransaction.id,
       walletType: "google_pay",
       deviceData: {
         deviceId: `device_${nanoid()}`,
@@ -878,44 +929,20 @@ export async function processGooglePay(req: Request, res: Response) {
       amount: Math.round(parseFloat(order.total) * 100)
     });
 
-    // Create transaction record
-    const [transaction] = await db.insert(paymentTransactions).values({
-      orderId,
-      userId,
-      type: "payment",
-      status: confirmedPayment.status === 'succeeded' ? "success" : "failed",
-      amount: order.total,
-      currency: order.currency,
-      gateway: "stripe",
-      gatewayTransactionId: confirmedPayment.id,
-      paymentMethod: {
-        methodId: walletPayment.id,
-        type: "google_pay",
-        brand: "google_pay"
-      },
-      fees: {
-        processingFee: "0.30",
-        gatewayFee: (parseFloat(order.total) * 0.029).toFixed(2),
-        totalFee: (parseFloat(order.total) * 0.029 + 0.30).toFixed(2)
-      },
-      fraud: {
-        riskScore: "15", // Google Pay has low fraud risk
-        status: "passed",
-        checks: {
-          cvv: "pass",
-          address: "pass",
-          postal: "pass"
-        }
-      },
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent') || "",
-      processedAt: new Date()
-    }).returning();
-
-    // Update wallet payment with transaction ID
-    await db.update(walletPayments)
-      .set({ transactionId: transaction.id })
-      .where(eq(walletPayments.id, walletPayment.id));
+    // Update the transaction record with real payment data
+    const [transaction] = await db.update(paymentTransactions)
+      .set({
+        status: confirmedPayment.status === 'succeeded' ? "success" : "failed",
+        gatewayTransactionId: confirmedPayment.id,
+        paymentMethod: {
+          methodId: walletPayment.id,
+          type: "google_pay",
+          brand: "google_pay"
+        },
+        processedAt: new Date()
+      })
+      .where(eq(paymentTransactions.id, tempTransaction.id))
+      .returning();
 
     // Update order status
     if (confirmedPayment.status === 'succeeded') {

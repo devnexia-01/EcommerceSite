@@ -19,6 +19,19 @@ import { setupNotificationRoutes } from "./notification-routes";
 import { setupAdminRoutes } from "./admin-routes";
 import { setupV1Routes } from "./v1-routes";
 import { setupOrderManagementRoutes } from "./order-management-service";
+import { 
+  processPayment, 
+  authorizePayment, 
+  capturePayment, 
+  refundPayment, 
+  getTransaction,
+  createPaymentMethod,
+  getUserPaymentMethods,
+  deletePaymentMethod,
+  process3DSecure,
+  processApplePay,
+  processGooglePay
+} from "./payment-service";
 import WebSocketService from "./services/websocket-service";
 
 // Enhanced request interface with user data
@@ -64,6 +77,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup comprehensive order management routes
   setupOrderManagementRoutes(app);
+  
+  // ============ PAYMENT SERVICE ROUTES ============
+  
+  // Payment Processing Endpoints
+  app.post("/api/v1/payments/process", authenticateToken, processPayment);
+  app.post("/api/v1/payments/authorize", authenticateToken, authorizePayment);
+  app.post("/api/v1/payments/capture/:transactionId", authenticateToken, capturePayment);
+  app.post("/api/v1/payments/refund", authenticateToken, refundPayment);
+  app.get("/api/v1/payments/:transactionId", authenticateToken, getTransaction);
+  
+  // Payment Methods Management
+  app.post("/api/v1/payment-methods", authenticateToken, createPaymentMethod);
+  app.get("/api/v1/payment-methods/user/:userId", authenticateToken, getUserPaymentMethods);
+  app.delete("/api/v1/payment-methods/:methodId", authenticateToken, deletePaymentMethod);
+  
+  // 3D Secure Authentication
+  app.post("/api/v1/payments/3d-secure", authenticateToken, process3DSecure);
+  
+  // Wallet Payments
+  app.post("/api/v1/payments/wallet/apple-pay", authenticateToken, processApplePay);
+  app.post("/api/v1/payments/wallet/google-pay", authenticateToken, processGooglePay);
   
   // Setup wishlist routes
   const { default: wishlistRoutes } = await import("./wishlist-routes.js");
