@@ -139,29 +139,26 @@ export default function ProductCard({ product }: ProductCardProps) {
               </div>
             </div>
 
-            <div className="flex items-end justify-between pt-2">
-              <div className="space-y-1 flex-1">
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg sm:text-xl lg:text-2xl font-serif font-bold text-foreground" data-testid={`product-price-${product.id}`}>
-                    ${parseFloat(product.price).toFixed(2)}
+            <div className="flex flex-col space-y-3 pt-2">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg sm:text-xl lg:text-2xl font-serif font-bold text-foreground" data-testid={`product-price-${product.id}`}>
+                  ${parseFloat(product.price).toFixed(2)}
+                </span>
+                {product.comparePrice && (
+                  <span className="text-xs sm:text-sm text-muted-foreground line-through" data-testid={`compare-price-${product.id}`}>
+                    ${parseFloat(product.comparePrice).toFixed(2)}
                   </span>
-                  {product.comparePrice && (
-                    <span className="text-xs sm:text-sm text-muted-foreground line-through" data-testid={`compare-price-${product.id}`}>
-                      ${parseFloat(product.comparePrice).toFixed(2)}
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
               <Button
                 size="sm"
                 onClick={handleAddToCart}
                 disabled={product.stock === 0}
-                className="furniture-btn-primary h-8 sm:h-9 lg:h-10 px-2 sm:px-3 lg:px-4 text-xs sm:text-sm"
+                className="furniture-btn-primary w-full h-9 sm:h-10 lg:h-11 text-xs sm:text-sm font-medium"
                 data-testid={`add-to-cart-${product.id}`}
               >
-                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Add to Cart</span>
-                <span className="sm:hidden">Add</span>
+                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                <span>Add to Cart</span>
               </Button>
             </div>
           </div>
