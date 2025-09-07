@@ -34,15 +34,6 @@ export default function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!isAuthenticated) {
-      toast({
-        title: "Please login",
-        description: "You need to be logged in to add items to cart",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (product.stock === 0) {
       toast({
         title: "Out of stock",
@@ -54,8 +45,16 @@ export default function ProductCard({ product }: ProductCardProps) {
 
     try {
       await addToCart(product.id);
+      toast({
+        title: "Added to cart",
+        description: `${product.name} has been added to your cart`,
+      });
     } catch (error) {
-      // Error handled by useCart hook
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
