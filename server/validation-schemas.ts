@@ -32,14 +32,14 @@ export const productSearchSchema = z.object({
   query: z.string().optional(),
   categoryId: z.string().uuid().optional(),
   brandId: z.string().uuid().optional(),
-  minPrice: z.number().positive().optional(),
-  maxPrice: z.number().positive().optional(),
+  minPrice: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val).optional(),
+  maxPrice: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val).optional(),
   attributes: z.record(z.any()).optional(),
   status: z.enum(['active', 'inactive', 'draft']).optional(),
   sortBy: z.enum(['name', 'price', 'rating', 'created']).default('created'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
-  limit: z.number().int().min(1).max(100).default(20),
-  offset: z.number().int().min(0).default(0)
+  limit: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(20),
+  offset: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(0)
 });
 
 // Product variant schemas
@@ -88,8 +88,8 @@ export const brandSearchSchema = z.object({
   status: z.enum(['active', 'inactive']).optional(),
   sortBy: z.enum(['name', 'created']).default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
-  limit: z.number().int().min(1).max(100).default(50),
-  offset: z.number().int().min(0).default(0)
+  limit: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(50),
+  offset: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(0)
 });
 
 // Category schemas (already exist but adding V1 versions)
@@ -111,8 +111,8 @@ export const categorySearchSchema = z.object({
   status: z.enum(['active', 'inactive']).optional(),
   sortBy: z.enum(['name', 'sortOrder', 'created']).default('sortOrder'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
-  limit: z.number().int().min(1).max(100).default(50),
-  offset: z.number().int().min(0).default(0)
+  limit: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(50),
+  offset: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(0)
 });
 
 // Common schemas
