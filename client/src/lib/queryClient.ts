@@ -15,9 +15,13 @@ export async function apiRequest(
 ): Promise<Response> {
   const accessToken = tokenManager.getAccessToken();
   
+  // Get session ID from localStorage for guest cart functionality
+  const sessionId = typeof window !== 'undefined' ? localStorage.getItem('cart-session-id') : null;
+  
   const headers: Record<string, string> = {
     ...(data ? { "Content-Type": "application/json" } : {}),
-    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...(sessionId ? { "x-session-id": sessionId } : {})
   };
 
   const res = await fetch(url, {
@@ -60,8 +64,12 @@ export const getQueryFn: <T>(options: {
 
     const accessToken = tokenManager.getAccessToken();
     
+    // Get session ID from localStorage for guest cart functionality
+    const sessionId = typeof window !== 'undefined' ? localStorage.getItem('cart-session-id') : null;
+    
     const headers: Record<string, string> = {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(sessionId ? { "x-session-id": sessionId } : {})
     };
 
     const res = await fetch(url, {
