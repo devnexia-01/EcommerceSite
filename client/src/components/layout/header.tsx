@@ -51,7 +51,7 @@ export default function Header() {
             {/* Logo */}
             <div className="flex items-center">
               <Link href="/">
-                <h1 className="text-3xl font-serif font-semibold text-primary cursor-pointer tracking-tight" data-testid="logo">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif font-semibold text-primary cursor-pointer tracking-tight" data-testid="logo">
                   EliteCommerce
                 </h1>
               </Link>
@@ -75,43 +75,44 @@ export default function Header() {
               </nav>
             </div>
 
-            {/* Search Bar */}
-            <div className="flex-1 max-w-lg mx-6">
-              <form onSubmit={handleSearch} className="relative">
+            {/* Search Bar - Hidden on mobile, shown in mobile menu */}
+            <div className="hidden md:flex flex-1 max-w-lg mx-6">
+              <form onSubmit={handleSearch} className="relative w-full">
                 <Input
                   type="text"
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-24 h-12 bg-background border-border rounded-full focus:ring-2 focus:ring-primary/20"
+                  className="w-full pl-12 pr-20 lg:pr-24 h-10 lg:h-12 bg-background border-border rounded-full focus:ring-2 focus:ring-primary/20 text-sm lg:text-base"
                   data-testid="search-input"
                 />
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Search className="absolute left-3 lg:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground" />
                 <Button 
                   type="submit" 
                   size="sm" 
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-4 rounded-full furniture-btn-primary"
+                  className="absolute right-1 lg:right-2 top-1/2 transform -translate-y-1/2 h-7 lg:h-8 px-2 lg:px-4 rounded-full furniture-btn-primary text-xs lg:text-sm"
                   data-testid="search-button"
                 >
-                  Search
+                  <span className="hidden lg:inline">Search</span>
+                  <Search className="h-3 w-3 lg:hidden" />
                 </Button>
               </form>
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 lg:space-x-3">
               {/* Cart */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative h-12 w-12 rounded-full hover:bg-secondary/50"
+                className="relative h-10 w-10 lg:h-12 lg:w-12 rounded-full hover:bg-secondary/50"
                 onClick={() => setIsCartOpen(true)}
                 data-testid="cart-button"
               >
-                <ShoppingCart className="h-6 w-6" />
+                <ShoppingCart className="h-5 w-5 lg:h-6 lg:w-6" />
                 {totalItems > 0 && (
                   <Badge 
-                    className="absolute -top-1 -right-1 h-6 w-6 flex items-center justify-center p-0 text-xs bg-primary text-primary-foreground"
+                    className="absolute -top-1 -right-1 h-5 w-5 lg:h-6 lg:w-6 flex items-center justify-center p-0 text-xs bg-primary text-primary-foreground"
                     data-testid="cart-badge"
                   >
                     {totalItems}
@@ -119,11 +120,11 @@ export default function Header() {
                 )}
               </Button>
 
-              {/* User Menu */}
+              {/* User Menu - Hidden on mobile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full hover:bg-secondary/50" data-testid="user-menu-button">
-                    <User className="h-6 w-6" />
+                  <Button variant="ghost" size="icon" className="hidden md:flex h-10 w-10 lg:h-12 lg:w-12 rounded-full hover:bg-secondary/50" data-testid="user-menu-button">
+                    <User className="h-5 w-5 lg:h-6 lg:w-6" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -165,13 +166,38 @@ export default function Header() {
               {/* Mobile Menu Button */}
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden h-12 w-12 rounded-full hover:bg-secondary/50" data-testid="mobile-menu-button">
-                    <Menu className="h-6 w-6" />
+                  <Button variant="ghost" size="icon" className="md:hidden h-10 w-10 rounded-full hover:bg-secondary/50" data-testid="mobile-menu-button">
+                    <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[300px] sm:w-[400px] bg-card">
-                  <div className="mt-8">
-                    <h2 className="text-2xl font-serif font-semibold text-primary mb-8">FURNISH</h2>
+                  <div className="mt-8 space-y-8">
+                    <h2 className="text-2xl font-serif font-semibold text-primary mb-8">EliteCommerce</h2>
+                    
+                    {/* Mobile Search */}
+                    <div className="">
+                      <form onSubmit={handleSearch} className="relative">
+                        <Input
+                          type="text"
+                          placeholder="Search products..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-12 pr-16 h-12 bg-background border-border rounded-full focus:ring-2 focus:ring-primary/20"
+                          data-testid="mobile-search-input"
+                        />
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Button 
+                          type="submit" 
+                          size="sm" 
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-3 rounded-full furniture-btn-primary"
+                          data-testid="mobile-search-button"
+                        >
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      </form>
+                    </div>
+
+                    {/* Navigation */}
                     <nav className="flex flex-col space-y-6">
                       {navigationItems.map((item) => (
                         <Link
@@ -185,6 +211,32 @@ export default function Header() {
                         </Link>
                       ))}
                     </nav>
+
+                    {/* Mobile User Actions */}
+                    <div className="border-t border-border pt-6 space-y-4">
+                      {isAuthenticated ? (
+                        <>
+                          <div className="text-sm font-medium text-muted-foreground">
+                            {user?.firstName || user?.username}
+                          </div>
+                          <div className="flex flex-col space-y-3">
+                            <Link href="/profile" className="text-foreground hover:text-primary" onClick={() => setIsMobileMenuOpen(false)}>Profile</Link>
+                            <Link href="/orders" className="text-foreground hover:text-primary" onClick={() => setIsMobileMenuOpen(false)}>Orders</Link>
+                            {user?.isAdmin && (
+                              <Link href="/admin" className="text-foreground hover:text-primary" onClick={() => setIsMobileMenuOpen(false)}>Admin</Link>
+                            )}
+                            <Button variant="ghost" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="justify-start p-0 h-auto text-foreground hover:text-primary">
+                              Logout
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col space-y-3">
+                          <Link href="/login" className="text-foreground hover:text-primary" onClick={() => setIsMobileMenuOpen(false)}>Login</Link>
+                          <Link href="/register" className="text-foreground hover:text-primary" onClick={() => setIsMobileMenuOpen(false)}>Register</Link>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
