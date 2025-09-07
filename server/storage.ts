@@ -970,6 +970,344 @@ export class DatabaseStorage implements IStorage {
       }
     };
   }
+
+  // ===== V1 API Methods =====
+  
+  // Products V1
+  async getProductsV1(params: {
+    categoryId?: string;
+    search?: string;
+    sortBy?: 'name' | 'price' | 'rating' | 'created';
+    sortOrder?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+    brand?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    status?: string;
+  } = {}): Promise<{ products: any[]; total: number }> {
+    const {
+      categoryId,
+      search,
+      sortBy = 'created',
+      sortOrder = 'desc',
+      limit = 20,
+      offset = 0,
+      brand,
+      minPrice,
+      maxPrice,
+      status = 'active'
+    } = params;
+
+    const conditions = [eq(products.status, status)];
+
+    if (categoryId) {
+      conditions.push(eq(products.categoryId, categoryId));
+    }
+
+    if (search) {
+      conditions.push(ilike(products.name, `%${search}%`));
+    }
+
+    if (minPrice !== undefined) {
+      conditions.push(gte(products.price, minPrice.toString()));
+    }
+
+    if (maxPrice !== undefined) {
+      conditions.push(lte(products.price, maxPrice.toString()));
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const sortColumn = {
+      name: products.name,
+      price: products.price,
+      rating: products.rating,
+      created: products.createdAt
+    }[sortBy];
+
+    const [productsResult, countResult] = await Promise.all([
+      db.select().from(products)
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(whereClause)
+        .orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(products)
+        .where(whereClause)
+    ]);
+
+    return {
+      products: productsResult.map(row => ({
+        productId: row.products.id,
+        sku: row.products.sku,
+        name: row.products.name,
+        slug: row.products.slug,
+        description: row.products.description,
+        shortDescription: row.products.shortDescription,
+        categories: row.products.categories || [],
+        pricing: {
+          basePrice: row.products.basePrice || row.products.price,
+          salePrice: row.products.salePrice,
+          currency: row.products.currency || "USD",
+          taxRate: row.products.taxRate || "0"
+        },
+        media: row.products.images?.map((url: string, index: number) => ({
+          mediaId: `${row.products.id}-${index}`,
+          type: "image",
+          url,
+          position: index
+        })) || [],
+        attributes: row.products.attributes || {},
+        seo: row.products.seo || {},
+        status: row.products.status,
+        metadata: {
+          createdAt: row.products.createdAt,
+          updatedAt: row.products.updatedAt,
+          publishedAt: row.products.publishedAt
+        },
+        category: row.categories ? {
+          id: row.categories.id,
+          name: row.categories.name,
+          slug: row.categories.slug
+        } : null
+      })),
+      total: countResult[0].count
+    };
+  }
+
+  async getProductByIdV1(productId: string): Promise<any> {
+    const [result] = await db.select().from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(products.id, productId));
+
+    if (!result) return null;
+
+    return {
+      productId: result.products.id,
+      sku: result.products.sku,
+      name: result.products.name,
+      slug: result.products.slug,
+      description: result.products.description,
+      shortDescription: result.products.shortDescription,
+      categories: result.products.categories || [],
+      pricing: {
+        basePrice: result.products.basePrice || result.products.price,
+        salePrice: result.products.salePrice,
+        currency: result.products.currency || "USD",
+        taxRate: result.products.taxRate || "0"
+      },
+      media: result.products.images?.map((url: string, index: number) => ({
+        mediaId: `${result.products.id}-${index}`,
+        type: "image",
+        url,
+        position: index
+      })) || [],
+      attributes: result.products.attributes || {},
+      seo: result.products.seo || {},
+      status: result.products.status,
+      metadata: {
+        createdAt: result.products.createdAt,
+        updatedAt: result.products.updatedAt,
+        publishedAt: result.products.publishedAt
+      },
+      category: result.categories ? {
+        id: result.categories.id,
+        name: result.categories.name,
+        slug: result.categories.slug
+      } : null
+    };
+  }
+
+  async createProductV1(productData: any): Promise<any> {
+    const newProduct = await db.insert(products).values({
+      sku: productData.sku,
+      name: productData.name,
+      slug: productData.slug,
+      description: productData.description,
+      shortDescription: productData.shortDescription,
+      price: productData.pricing?.basePrice || productData.price,
+      basePrice: productData.pricing?.basePrice,
+      salePrice: productData.pricing?.salePrice,
+      currency: productData.pricing?.currency || "USD",
+      taxRate: productData.pricing?.taxRate || "0",
+      categoryId: productData.categoryId,
+      imageUrl: productData.media?.[0]?.url,
+      images: productData.media?.map((m: any) => m.url) || [],
+      attributes: productData.attributes || {},
+      seo: productData.seo || {},
+      status: productData.status || "active",
+      stock: productData.inventory?.quantity || 0
+    } as any).returning();
+
+    return newProduct[0];
+  }
+
+  async updateProductV1(productId: string, productData: any): Promise<any> {
+    const updateData: any = {
+      updatedAt: sql`now()`
+    };
+
+    if (productData.name) updateData.name = productData.name;
+    if (productData.description) updateData.description = productData.description;
+    if (productData.pricing?.basePrice) {
+      updateData.basePrice = productData.pricing.basePrice;
+      updateData.price = productData.pricing.basePrice;
+    }
+    if (productData.pricing?.salePrice) updateData.salePrice = productData.pricing.salePrice;
+    if (productData.attributes) updateData.attributes = productData.attributes;
+    if (productData.seo) updateData.seo = productData.seo;
+    if (productData.status) updateData.status = productData.status;
+
+    const [updatedProduct] = await db
+      .update(products)
+      .set(updateData)
+      .where(eq(products.id, productId))
+      .returning();
+
+    return updatedProduct;
+  }
+
+  async deleteProductV1(productId: string): Promise<void> {
+    await db.delete(products).where(eq(products.id, productId));
+  }
+
+  async getProductVariants(productId: string): Promise<any[]> {
+    // For now, return empty array as we'll implement variants later
+    return [];
+  }
+
+  async addProductMedia(productId: string, mediaData: any): Promise<any> {
+    // For now, add to the images array
+    const product = await this.getProduct(productId);
+    if (!product) throw new Error("Product not found");
+
+    const updatedImages = [...(product.images || []), mediaData.url];
+    await db.update(products)
+      .set({ images: updatedImages })
+      .where(eq(products.id, productId));
+
+    return {
+      mediaId: `${productId}-${updatedImages.length - 1}`,
+      type: mediaData.type || "image",
+      url: mediaData.url,
+      position: updatedImages.length - 1
+    };
+  }
+
+  async searchProductsV1(params: {
+    query?: string;
+    category?: string;
+    brand?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    limit?: number;
+  }): Promise<{ products: any[]; total: number }> {
+    return this.getProductsV1(params);
+  }
+
+  async getProductFilters(): Promise<any> {
+    const [categoriesResult, priceRange] = await Promise.all([
+      db.select().from(categories),
+      db.select({
+        min: sql<number>`MIN(${products.price}::numeric)`,
+        max: sql<number>`MAX(${products.price}::numeric)`
+      }).from(products)
+    ]);
+
+    return {
+      categories: categoriesResult,
+      priceRange: {
+        min: priceRange[0]?.min || 0,
+        max: priceRange[0]?.max || 1000
+      },
+      brands: [] // Will implement when brands table is used
+    };
+  }
+
+  // Categories V1
+  async getCategoriesV1(params: { includeChildren?: boolean } = {}): Promise<any[]> {
+    const categoriesResult = await db.select().from(categories);
+    
+    return categoriesResult.map(category => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      emoji: category.emoji,
+      parentId: category.parentId,
+      imageUrl: category.imageUrl,
+      status: category.status,
+      sortOrder: category.sortOrder,
+      seo: category.seo,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt
+    }));
+  }
+
+  async getCategoryByIdV1(categoryId: string): Promise<any> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, categoryId));
+    if (!category) return null;
+
+    return {
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      emoji: category.emoji,
+      parentId: category.parentId,
+      imageUrl: category.imageUrl,
+      status: category.status,
+      sortOrder: category.sortOrder,
+      seo: category.seo,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt
+    };
+  }
+
+  async createCategoryV1(categoryData: any): Promise<any> {
+    const [newCategory] = await db.insert(categories).values({
+      name: categoryData.name,
+      slug: categoryData.slug,
+      description: categoryData.description,
+      emoji: categoryData.emoji,
+      parentId: categoryData.parentId,
+      imageUrl: categoryData.imageUrl,
+      status: categoryData.status || "active",
+      sortOrder: categoryData.sortOrder || 0,
+      seo: categoryData.seo || {}
+    } as any).returning();
+
+    return newCategory;
+  }
+
+  async updateCategoryV1(categoryId: string, categoryData: any): Promise<any> {
+    const updateData = {
+      ...categoryData,
+      updatedAt: sql`now()`
+    };
+
+    const [updatedCategory] = await db
+      .update(categories)
+      .set(updateData)
+      .where(eq(categories.id, categoryId))
+      .returning();
+
+    return updatedCategory;
+  }
+
+  async deleteCategoryV1(categoryId: string): Promise<void> {
+    await db.delete(categories).where(eq(categories.id, categoryId));
+  }
+
+  async getProductsByCategoryV1(categoryId: string, params: {
+    limit?: number;
+    offset?: number;
+    sortBy?: string;
+    sortOrder?: string;
+  }): Promise<{ products: any[]; total: number }> {
+    return this.getProductsV1({ ...params, categoryId });
+  }
 }
 
 export const storage = new DatabaseStorage();
