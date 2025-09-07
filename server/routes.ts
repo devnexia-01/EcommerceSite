@@ -439,6 +439,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get orders for current user
+  app.get("/api/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const orders = await storage.getOrders(userId);
+      res.json(orders);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin order management
   app.get("/api/admin/orders", requireAdmin, async (req: Request, res: Response) => {
     try {

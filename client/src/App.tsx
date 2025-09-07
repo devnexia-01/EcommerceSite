@@ -25,6 +25,7 @@ import Help from "./pages/help";
 import Returns from "./pages/returns";
 import Shipping from "./pages/shipping";
 import SizeGuide from "./pages/size-guide";
+import Orders from "./pages/orders";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/returns" component={Returns} />
       <Route path="/shipping" component={Shipping} />
       <Route path="/size-guide" component={SizeGuide} />
+      <Route path="/orders" component={Orders} />
       <Route component={NotFound} />
     </Switch>
   );
