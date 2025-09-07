@@ -41,34 +41,135 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at")
 });
 
-// Categories table
+// Categories table - Enhanced with parent-child relationship
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
   emoji: text("emoji"),
-  createdAt: timestamp("created_at").default(sql`now()`)
+  parentId: uuid("parent_id"),
+  imageUrl: text("image_url"),
+  status: text("status").default("active"), // active, inactive
+  sortOrder: integer("sort_order").default(0),
+  seo: jsonb("seo").$type<{
+    metaTitle?: string;
+    metaDescription?: string;
+    keywords?: string[];
+  }>(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
 });
 
-// Products table
-export const products = pgTable("products", {
+// Brands table
+export const brands = pgTable("brands", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
+  logo: text("logo"),
+  website: text("website"),
+  status: text("status").default("active"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Products table - Enhanced with comprehensive product model
+export const products = pgTable("products", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  sku: text("sku").notNull().unique(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  shortDescription: text("short_description"),
+  categories: jsonb("categories").$type<string[]>().default([]),
+  brandId: uuid("brand_id").references(() => brands.id),
+  
+  // Pricing
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }),
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }),
+  currency: text("currency").default("USD"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).default("0"),
+  
+  // Legacy fields for backward compatibility
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   comparePrice: decimal("compare_price", { precision: 10, scale: 2 }),
-  sku: text("sku").unique(),
   stock: integer("stock").default(0),
   categoryId: uuid("category_id").references(() => categories.id),
   imageUrl: text("image_url"),
   images: jsonb("images").$type<string[]>().default([]),
+  
+  // Enhanced attributes
+  attributes: jsonb("attributes").$type<{
+    weight?: number;
+    dimensions?: {
+      length: number;
+      width: number;
+      height: number;
+    };
+    materials?: string[];
+    features?: string[];
+    warranty?: string;
+  }>(),
+  
+  // SEO
+  seo: jsonb("seo").$type<{
+    metaTitle?: string;
+    metaDescription?: string;
+    keywords?: string[];
+  }>(),
+  
+  // Ratings and reviews
   rating: decimal("rating", { precision: 2, scale: 1 }).default("0"),
   reviewCount: integer("review_count").default(0),
+  
+  // Status and metadata
   status: text("status").default("active"), // active, draft, archived
+  publishedAt: timestamp("published_at"),
   createdAt: timestamp("created_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Product variants table
+export const productVariants = pgTable("product_variants", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  sku: text("sku").notNull().unique(),
+  
+  // Variant attributes
+  attributes: jsonb("attributes").$type<{
+    color?: string;
+    size?: string;
+    material?: string;
+    [key: string]: any;
+  }>(),
+  
+  // Pricing
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  
+  // Inventory
+  quantity: integer("quantity").default(0),
+  reserved: integer("reserved").default(0),
+  
+  // Media
+  media: jsonb("media").$type<string[]>().default([]),
+  
+  status: text("status").default("active"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Product media table
+export const productMedia = pgTable("product_media", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  type: text("type").notNull(), // image, video, 3d
+  url: text("url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  alt: text("alt"),
+  position: integer("position").default(0),
+  createdAt: timestamp("created_at").default(sql`now()`)
 });
 
 // User preferences table
@@ -243,7 +344,16 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   })
 }));
 
-export const categoriesRelations = relations(categories, ({ many }) => ({
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
+  parent: one(categories, {
+    fields: [categories.parentId],
+    references: [categories.id]
+  }),
+  children: many(categories),
+  products: many(products)
+}));
+
+export const brandsRelations = relations(brands, ({ many }) => ({
   products: many(products)
 }));
 
@@ -252,9 +362,29 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     fields: [products.categoryId],
     references: [categories.id]
   }),
+  brand: one(brands, {
+    fields: [products.brandId],
+    references: [brands.id]
+  }),
+  variants: many(productVariants),
+  media: many(productMedia),
   cartItems: many(cartItems),
   orderItems: many(orderItems),
   reviews: many(reviews)
+}));
+
+export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+  product: one(products, {
+    fields: [productVariants.productId],
+    references: [products.id]
+  })
+}));
+
+export const productMediaRelations = relations(productMedia, ({ one }) => ({
+  product: one(products, {
+    fields: [productMedia.productId],
+    references: [products.id]
+  })
 }));
 
 export const addressesRelations = relations(addresses, ({ one }) => ({
@@ -371,10 +501,27 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
   createdAt: true
 });
 
+export const insertBrandSchema = createInsertSchema(brands).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
   updatedAt: true
+});
+
+export const insertProductVariantSchema = createInsertSchema(productVariants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertProductMediaSchema = createInsertSchema(productMedia).omit({
+  id: true,
+  createdAt: true
 });
 
 export const insertAddressSchema = createInsertSchema(addresses).omit({

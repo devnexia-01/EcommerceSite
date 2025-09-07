@@ -1,0 +1,99 @@
+#### 3.2.2 Features & Endpoints
+
+##### Product Management
+```
+GET    /api/v1/products
+GET    /api/v1/products/{productId}
+POST   /api/v1/products
+PUT    /api/v1/products/{productId}
+DELETE /api/v1/products/{productId}
+GET    /api/v1/products/{productId}/variants
+POST   /api/v1/products/{productId}/media
+GET    /api/v1/products/search
+GET    /api/v1/products/filters
+```
+
+##### Category Management
+```
+GET    /api/v1/categories
+GET    /api/v1/categories/{categoryId}
+POST   /api/v1/categories
+PUT    /api/v1/categories/{categoryId}
+DELETE /api/v1/categories/{categoryId}
+GET    /api/v1/categories/{categoryId}/products
+```
+
+#### 3.2.3 Data Models
+
+```json
+{
+  "Product": {
+    "productId": "UUID",
+    "sku": "string",
+    "name": "string",
+    "slug": "string",
+    "description": "string",
+    "shortDescription": "string",
+    "categories": ["categoryId"],
+    "brand": {
+      "brandId": "UUID",
+      "name": "string",
+      "logo": "string"
+    },
+    "pricing": {
+      "basePrice": "decimal",
+      "salePrice": "decimal",
+      "currency": "string",
+      "taxRate": "decimal"
+    },
+    "variants": [{
+      "variantId": "UUID",
+      "sku": "string",
+      "attributes": {
+        "color": "string",
+        "size": "string",
+        "material": "string"
+      },
+      "pricing": {
+        "price": "decimal",
+        "compareAtPrice": "decimal"
+      },
+      "inventory": {
+        "quantity": "integer",
+        "reserved": "integer"
+      },
+      "media": ["mediaUrl"]
+    }],
+    "media": [{
+      "mediaId": "UUID",
+      "type": "enum[image|video|3d]",
+      "url": "string",
+      "thumbnailUrl": "string",
+      "alt": "string",
+      "position": "integer"
+    }],
+    "attributes": {
+      "weight": "decimal",
+      "dimensions": {
+        "length": "decimal",
+        "width": "decimal",
+        "height": "decimal"
+      },
+      "materials": ["string"],
+      "features": ["string"],
+      "warranty": "string"
+    },
+    "seo": {
+      "metaTitle": "string",
+      "metaDescription": "string",
+      "keywords": ["string"]
+    },
+    "status": "enum[active|draft|archived]",
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "publishedAt": "timestamp"
+    }
+  }
+}
+```
