@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Edit, Trash2, Package, Users, ShoppingCart, TrendingUp, Search, Filter } from "lucide-react";
+import { 
+  Plus, Edit, Trash2, Package, Users, ShoppingCart, TrendingUp, Search, Filter,
+  Shield, Settings, FileText, Image, AlertTriangle, Activity, Database,
+  Clock, Eye, Ban, UserMinus, Key, Download, Upload, Server, BarChart3
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,6 +73,32 @@ export default function Admin() {
   const { data: categories = [] } = useQuery({
     queryKey: ["/api/categories"],
     enabled: isAuthenticated && user?.isAdmin
+  });
+
+  // Admin Dashboard Data
+  const { data: dashboardOverview, isLoading: dashboardLoading } = useQuery({
+    queryKey: ["/api/v1/admin/dashboard/overview"],
+    enabled: isAuthenticated && user?.isAdmin
+  });
+
+  const { data: adminUsers = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["/api/v1/admin/users", { limit: 50 }],
+    enabled: isAuthenticated && user?.isAdmin && activeTab === "users"
+  });
+
+  const { data: auditLogs = [], isLoading: auditLoading } = useQuery({
+    queryKey: ["/api/v1/admin/audit/logs", { limit: 50 }],
+    enabled: isAuthenticated && user?.isAdmin && activeTab === "audit"
+  });
+
+  const { data: securityLogs = [], isLoading: securityLoading } = useQuery({
+    queryKey: ["/api/v1/admin/security/threats", { limit: 50 }],
+    enabled: isAuthenticated && user?.isAdmin && activeTab === "security"
+  });
+
+  const { data: systemHealth, isLoading: systemLoading } = useQuery({
+    queryKey: ["/api/v1/admin/dashboard/system-health"],
+    enabled: isAuthenticated && user?.isAdmin && activeTab === "system"
   });
 
   // Mutations
@@ -185,11 +215,24 @@ export default function Admin() {
     }
   };
 
-  const stats = {
+  const stats = dashboardOverview?.data ? {
+    totalProducts: dashboardOverview.data.totalProducts || 0,
+    totalUsers: dashboardOverview.data.totalUsers || 0,
+    totalOrders: dashboardOverview.data.totalOrders || 0,
+    totalRevenue: dashboardOverview.data.totalRevenue || 0,
+    newUsersToday: dashboardOverview.data.newUsersToday || 0,
+    ordersToday: dashboardOverview.data.ordersToday || 0,
+    revenueToday: dashboardOverview.data.revenueToday || 0,
+    totalActiveUsers: dashboardOverview.data.totalActiveUsers || 0
+  } : {
     totalProducts: products.products?.length || 0,
+    totalUsers: 0,
     totalOrders: orders.length || 0,
     totalRevenue: orders.reduce((sum: number, order: any) => sum + parseFloat(order.total || 0), 0),
-    pendingOrders: orders.filter((order: any) => order.status === "pending").length
+    newUsersToday: 0,
+    ordersToday: 0,
+    revenueToday: 0,
+    totalActiveUsers: 0
   };
 
   return (
@@ -202,10 +245,14 @@ export default function Admin() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
               <TrendingUp className="h-4 w-4" />
-              Overview
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2" data-testid="tab-users">
+              <Users className="h-4 w-4" />
+              Users
             </TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-2" data-testid="tab-products">
               <Package className="h-4 w-4" />
@@ -215,9 +262,21 @@ export default function Admin() {
               <ShoppingCart className="h-4 w-4" />
               Orders
             </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2" data-testid="tab-categories">
-              <Filter className="h-4 w-4" />
-              Categories
+            <TabsTrigger value="content" className="flex items-center gap-2" data-testid="tab-content">
+              <FileText className="h-4 w-4" />
+              Content
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center gap-2" data-testid="tab-security">
+              <Shield className="h-4 w-4" />
+              Security
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-2" data-testid="tab-audit">
+              <Activity className="h-4 w-4" />
+              Audit
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex items-center gap-2" data-testid="tab-system">
+              <Server className="h-4 w-4" />
+              System
             </TabsTrigger>
           </TabsList>
 
@@ -226,13 +285,16 @@ export default function Admin() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="stat-total-products">
-                    {stats.totalProducts}
+                  <div className="text-2xl font-bold" data-testid="stat-total-users">
+                    {stats.totalUsers}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    +{stats.newUsersToday} today
+                  </p>
                 </CardContent>
               </Card>
 
@@ -245,6 +307,9 @@ export default function Admin() {
                   <div className="text-2xl font-bold" data-testid="stat-total-orders">
                     {stats.totalOrders}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    +{stats.ordersToday} today
+                  </p>
                 </CardContent>
               </Card>
 
@@ -257,18 +322,24 @@ export default function Admin() {
                   <div className="text-2xl font-bold" data-testid="stat-total-revenue">
                     ${stats.totalRevenue.toFixed(2)}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    +${stats.revenueToday.toFixed(2)} today
+                  </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="stat-pending-orders">
-                    {stats.pendingOrders}
+                  <div className="text-2xl font-bold" data-testid="stat-active-users">
+                    {stats.totalActiveUsers}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Last 30 days
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -302,6 +373,117 @@ export default function Admin() {
                             <Badge variant="outline">{order.status}</Badge>
                           </TableCell>
                           <TableCell>${parseFloat(order.total).toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>User Management</CardTitle>
+                <Button data-testid="add-user">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Admin User
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {/* Search and Filters */}
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search users..."
+                      className="pl-8"
+                      data-testid="search-users"
+                    />
+                  </div>
+                  <Select>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="banned">Banned</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {usersLoading ? (
+                  <LoadingSpinner className="mx-auto" />
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Login</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adminUsers.data?.map((user: any) => (
+                        <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Users className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="font-medium">
+                                  {user.firstName} {user.lastName}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  @{user.username}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.isAdmin ? "default" : "secondary"}>
+                              {user.isAdmin ? "Admin" : "User"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                user.accountLocked ? "destructive" : 
+                                user.emailVerified ? "default" : "secondary"
+                              }
+                            >
+                              {user.accountLocked ? "Suspended" : 
+                               user.emailVerified ? "Active" : "Pending"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {user.lastLoginAt 
+                              ? new Date(user.lastLoginAt).toLocaleDateString()
+                              : "Never"
+                            }
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button variant="outline" size="sm" data-testid={`view-user-${user.id}`}>
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                              <Button variant="outline" size="sm" data-testid={`suspend-user-${user.id}`}>
+                                <Ban className="h-3 w-3" />
+                              </Button>
+                              <Button variant="outline" size="sm" data-testid={`reset-password-${user.id}`}>
+                                <Key className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -599,7 +781,339 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* Categories Tab */}
+          {/* Content Management Tab */}
+          <TabsContent value="content" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Content Management</CardTitle>
+                <Button data-testid="add-content">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Content
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search content..."
+                      className="pl-8"
+                      data-testid="search-content"
+                    />
+                  </div>
+                  <Select>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filter by type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Content</SelectItem>
+                      <SelectItem value="article">Articles</SelectItem>
+                      <SelectItem value="page">Pages</SelectItem>
+                      <SelectItem value="media">Media</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Modified</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground text-center" colSpan={6}>
+                        No content items found. Create your first content item to get started.
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="security" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Security Threats
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {securityLoading ? (
+                    <LoadingSpinner className="mx-auto" />
+                  ) : (
+                    <div className="space-y-2">
+                      {securityLogs.data?.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-4">
+                          No security threats detected
+                        </p>
+                      ) : (
+                        securityLogs.data?.slice(0, 5).map((log: any) => (
+                          <div key={log.id} className="flex items-center justify-between p-2 rounded border">
+                            <div className="flex items-center space-x-2">
+                              <AlertTriangle className={`h-4 w-4 ${
+                                log.severity === 'high' ? 'text-red-500' : 
+                                log.severity === 'medium' ? 'text-yellow-500' : 
+                                'text-blue-500'
+                              }`} />
+                              <div>
+                                <p className="text-sm font-medium">{log.type}</p>
+                                <p className="text-xs text-muted-foreground">{log.description}</p>
+                              </div>
+                            </div>
+                            <Badge variant={log.resolved ? "default" : "destructive"}>
+                              {log.resolved ? "Resolved" : "Active"}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Ban className="h-5 w-5" />
+                    IP Blacklist
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex space-x-2">
+                      <Input placeholder="IP Address" />
+                      <Button size="sm">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="text-muted-foreground text-center py-4">
+                      No blocked IP addresses
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Failed Login Attempts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>IP Address</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>User Agent</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground text-center" colSpan={5}>
+                        No failed login attempts recorded
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Audit Tab */}
+          <TabsContent value="audit" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Audit Logs
+                </CardTitle>
+                <Button variant="outline" data-testid="export-audit">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Logs
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search audit logs..."
+                      className="pl-8"
+                      data-testid="search-audit"
+                    />
+                  </div>
+                  <Select>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filter by action" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Actions</SelectItem>
+                      <SelectItem value="create">Create</SelectItem>
+                      <SelectItem value="update">Update</SelectItem>
+                      <SelectItem value="delete">Delete</SelectItem>
+                      <SelectItem value="login">Login</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {auditLoading ? (
+                  <LoadingSpinner className="mx-auto" />
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Time</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Action</TableHead>
+                        <TableHead>Resource</TableHead>
+                        <TableHead>IP Address</TableHead>
+                        <TableHead>Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {auditLogs.data?.length === 0 ? (
+                        <TableRow>
+                          <TableCell className="text-muted-foreground text-center" colSpan={6}>
+                            No audit logs found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        auditLogs.data?.map((log: any) => (
+                          <TableRow key={log.id}>
+                            <TableCell>
+                              {new Date(log.timestamp).toLocaleString()}
+                            </TableCell>
+                            <TableCell>{log.actorName || log.actorId}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{log.action}</Badge>
+                            </TableCell>
+                            <TableCell>{log.resource}</TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {log.context?.ipAddress || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* System Tab */}
+          <TabsContent value="system" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Server className="h-5 w-5" />
+                    System Health
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {systemLoading ? (
+                    <LoadingSpinner className="mx-auto" />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span>Database</span>
+                        <Badge variant="default">Connected</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Server Status</span>
+                        <Badge variant="default">Running</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Memory Usage</span>
+                        <span className="text-sm text-muted-foreground">
+                          {systemHealth?.data?.memoryUsage?.toFixed(2) || 0} MB
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Uptime</span>
+                        <span className="text-sm text-muted-foreground">
+                          {Math.floor((systemHealth?.data?.serverUptime || 0) / 3600)}h{' '}
+                          {Math.floor(((systemHealth?.data?.serverUptime || 0) % 3600) / 60)}m
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Backup Management
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <Button className="w-full" data-testid="create-backup">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Create Backup
+                    </Button>
+                    <div className="text-muted-foreground text-center py-4">
+                      No recent backups
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>System Configuration</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Site Name</Label>
+                      <Input defaultValue="E-commerce Platform" />
+                    </div>
+                    <div>
+                      <Label>Maintenance Mode</Label>
+                      <Select defaultValue="disabled">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="enabled">Enabled</SelectItem>
+                          <SelectItem value="disabled">Disabled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline">Reset to Defaults</Button>
+                    <Button>Save Configuration</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Categories Tab (Legacy - keeping for backward compatibility) */}
           <TabsContent value="categories" className="space-y-6 mt-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
