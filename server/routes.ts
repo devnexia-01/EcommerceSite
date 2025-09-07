@@ -18,6 +18,7 @@ import { emailNotificationService } from "./email-service";
 import { setupNotificationRoutes } from "./notification-routes";
 import { setupAdminRoutes } from "./admin-routes";
 import { setupV1Routes } from "./v1-routes";
+import { setupOrderManagementRoutes } from "./order-management-service";
 import WebSocketService from "./services/websocket-service";
 
 // Enhanced request interface with user data
@@ -61,6 +62,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup v1 API routes
   setupV1Routes(app, storage);
   
+  // Setup comprehensive order management routes
+  setupOrderManagementRoutes(app);
+  
   // Setup wishlist routes
   const { default: wishlistRoutes } = await import("./wishlist-routes.js");
   app.use("/api/wishlists", wishlistRoutes);
@@ -68,8 +72,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup content routes (footer links, contact, support, etc.)
   const { default: contentRoutes } = await import("./content-routes.js");
   app.use("/api/content", contentRoutes);
-  
-  // Order management routes are integrated into v1-routes.ts
 
   // Legacy session-based auth routes for backward compatibility
   app.post("/api/auth/register", async (req: Request, res: Response) => {
