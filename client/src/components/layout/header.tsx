@@ -52,7 +52,7 @@ export default function Header() {
             <div className="flex items-center">
               <Link href="/">
                 <h1 className="text-3xl font-serif font-semibold text-primary cursor-pointer tracking-tight" data-testid="logo">
-                  FURNISH
+                  EliteCommerce
                 </h1>
               </Link>
 
@@ -80,7 +80,7 @@ export default function Header() {
               <form onSubmit={handleSearch} className="relative">
                 <Input
                   type="text"
-                  placeholder="Search furniture & home decor..."
+                  placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-12 pr-24 h-12 bg-background border-border rounded-full focus:ring-2 focus:ring-primary/20"
