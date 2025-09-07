@@ -36,7 +36,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
   if (!isAuthenticated) {
     return (
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent className="w-96 flex flex-col" data-testid="cart-sidebar">
+        <SheetContent className="w-full sm:w-96 max-w-md flex flex-col" data-testid="cart-sidebar">
           <SheetHeader>
             <SheetTitle className="flex items-center justify-between">
               Shopping Cart
@@ -61,7 +61,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-96 flex flex-col" data-testid="cart-sidebar">
+      <SheetContent className="w-full sm:w-96 max-w-md flex flex-col" data-testid="cart-sidebar">
         <SheetHeader>
           <SheetTitle className="flex items-center justify-between">
             Shopping Cart ({items.length} items)
@@ -89,38 +89,38 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
             {/* Cart Items */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
               {items.map((item) => (
-                <div key={item.id} className="flex items-start space-x-4" data-testid={`cart-item-${item.id}`}>
+                <div key={item.id} className="flex items-start space-x-3" data-testid={`cart-item-${item.id}`}>
                   <img
                     src={item.product.imageUrl || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80"}
                     alt={item.product.name}
-                    className="w-16 h-16 object-cover rounded-md"
+                    className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
                     data-testid={`cart-item-image-${item.id}`}
                   />
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm truncate" data-testid={`cart-item-name-${item.id}`}>
+                    <h4 className="font-medium text-xs sm:text-sm truncate" data-testid={`cart-item-name-${item.id}`}>
                       {item.product.name}
                     </h4>
-                    <p className="text-sm text-muted-foreground" data-testid={`cart-item-price-${item.id}`}>
+                    <p className="text-xs sm:text-sm text-muted-foreground" data-testid={`cart-item-price-${item.id}`}>
                       ${parseFloat(item.product.price).toFixed(2)} each
                     </p>
                     <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 sm:h-7 sm:w-7"
                           onClick={() => handleQuantityChange(item.id, item.quantity, -1)}
                           data-testid={`decrease-quantity-${item.id}`}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="text-sm font-medium w-8 text-center" data-testid={`quantity-${item.id}`}>
+                        <span className="text-xs sm:text-sm font-medium w-6 sm:w-8 text-center" data-testid={`quantity-${item.id}`}>
                           {item.quantity}
                         </span>
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 sm:h-7 sm:w-7"
                           onClick={() => handleQuantityChange(item.id, item.quantity, 1)}
                           disabled={item.quantity >= item.product.stock}
                           data-testid={`increase-quantity-${item.id}`}
@@ -128,7 +128,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                           <Plus className="h-3 w-3" />
                         </Button>
                       </div>
-                      <span className="font-medium text-sm" data-testid={`item-total-${item.id}`}>
+                      <span className="font-medium text-xs sm:text-sm" data-testid={`item-total-${item.id}`}>
                         ${(parseFloat(item.product.price) * item.quantity).toFixed(2)}
                       </span>
                     </div>
@@ -136,7 +136,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0"
                     onClick={() => handleRemove(item.id)}
                     data-testid={`remove-item-${item.id}`}
                   >
@@ -149,7 +149,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
             <Separator />
 
             {/* Cart Summary */}
-            <div className="space-y-4 py-4">
+            <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
@@ -166,7 +166,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                   <span data-testid="cart-tax">${tax.toFixed(2)}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between font-semibold text-lg">
+                <div className="flex justify-between font-semibold text-base sm:text-lg">
                   <span>Total</span>
                   <span data-testid="cart-total">${total.toFixed(2)}</span>
                 </div>
@@ -181,7 +181,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
               <div className="space-y-2">
                 <Button 
                   asChild 
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10 sm:h-11"
                   data-testid="checkout-button"
                 >
                   <Link href="/checkout" onClick={onClose}>
@@ -191,7 +191,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                 <Button 
                   variant="outline" 
                   asChild 
-                  className="w-full"
+                  className="w-full h-9 sm:h-10"
                   data-testid="view-cart-button"
                 >
                   <Link href="/cart" onClick={onClose}>
