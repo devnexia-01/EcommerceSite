@@ -13,7 +13,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
-import { useCart } from "@/hooks/use-cart";
+import { useCart } from "@/hooks/use-enhanced-cart";
 import CartSidebar from "../cart/cart-sidebar";
 
 export default function Header() {

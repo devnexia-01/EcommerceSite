@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useCart } from "@/hooks/use-cart";
+import { useCart } from "@/hooks/use-enhanced-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 
