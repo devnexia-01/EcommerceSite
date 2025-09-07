@@ -1,11 +1,13 @@
 import sgMail from '@sendgrid/mail';
 import { storage } from './storage';
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY environment variable must be set");
-}
+const isEmailEnabled = !!process.env.SENDGRID_API_KEY;
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+if (isEmailEnabled) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+} else {
+  console.warn("SENDGRID_API_KEY not set. Email functionality will be disabled.");
+}
 
 export interface EmailTemplate {
   subject: string;
@@ -160,6 +162,11 @@ export class EmailNotificationService {
     userPreferences?: any
   ): Promise<boolean> {
     try {
+      if (!isEmailEnabled) {
+        console.log(`Email notification ${type} skipped - SENDGRID_API_KEY not configured`);
+        return true; // Not an error, email is just disabled
+      }
+
       // Check if user has this notification type enabled
       if (userPreferences) {
         const canSend = this.checkUserPreferences(type, userPreferences);
