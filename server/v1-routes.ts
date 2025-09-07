@@ -41,6 +41,36 @@ export function setupV1Routes(app: any, storage: any) {
     }
   });
 
+  // GET /api/v1/products/search (must be before /:productId)
+  app.get("/api/v1/products/search", async (req: Request, res: Response) => {
+    try {
+      const { q, category, brand, minPrice, maxPrice, limit = "20" } = req.query as Record<string, string>;
+      
+      const results = await storage.searchProductsV1({
+        query: q,
+        category,
+        brand,
+        minPrice: minPrice ? parseFloat(minPrice) : undefined,
+        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+        limit: parseInt(limit)
+      });
+      
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/v1/products/filters (must be before /:productId)
+  app.get("/api/v1/products/filters", async (req: Request, res: Response) => {
+    try {
+      const filters = await storage.getProductFilters();
+      res.json(filters);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/v1/products/:productId
   app.get("/api/v1/products/:productId", async (req: Request, res: Response) => {
     try {
@@ -111,36 +141,6 @@ export function setupV1Routes(app: any, storage: any) {
       res.status(201).json(media);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    }
-  });
-
-  // GET /api/v1/products/search
-  app.get("/api/v1/products/search", async (req: Request, res: Response) => {
-    try {
-      const { q, category, brand, minPrice, maxPrice, limit = "20" } = req.query as Record<string, string>;
-      
-      const results = await storage.searchProductsV1({
-        query: q,
-        category,
-        brand,
-        minPrice: minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-        limit: parseInt(limit)
-      });
-      
-      res.json(results);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // GET /api/v1/products/filters
-  app.get("/api/v1/products/filters", async (req: Request, res: Response) => {
-    try {
-      const filters = await storage.getProductFilters();
-      res.json(filters);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
     }
   });
 
