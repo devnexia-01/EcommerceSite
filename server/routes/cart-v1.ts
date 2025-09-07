@@ -16,7 +16,7 @@ interface AuthenticatedRequest extends express.Request {
 // Middleware to extract user info from session or token
 const getUserInfo = (req: AuthenticatedRequest) => {
   const userId = req.user?.id; // From authentication middleware
-  const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+  const sessionId = req.headers['x-session-id'] as string;
   return { userId, sessionId };
 };
 
@@ -70,10 +70,19 @@ router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: express.Resp
     const cart = await cartService.getCart(userId, sessionId);
     
     if (!cart) {
+      // Create a new cart if none exists
+      const newCartId = await cartService.getOrCreateCart(userId, sessionId);
+      const newCart = await cartService.getCart(userId, sessionId);
+      
+      if (newCart) {
+        return res.json(newCart);
+      }
+      
+      // Fallback response if cart creation fails - use the original sessionId
       return res.json({
         id: null,
         userId,
-        sessionId,
+        sessionId: sessionId, // Use the original session ID from request
         items: [],
         summary: {
           subtotal: "0",
