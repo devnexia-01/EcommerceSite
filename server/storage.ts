@@ -1,6 +1,8 @@
 import { 
   users, categories, products, addresses, cartItems, orders, orderItems, reviews,
   userPreferences, userSettings, refreshTokens, passwordResetTokens, loginSessions,
+  adminRoles, adminUsers, adminPermissions, systemConfig, auditLogs, content,
+  media, userActivity, securityLogs, ipBlacklist, backupLogs,
   type User, type InsertUser, type Category, type InsertCategory, 
   type Product, type InsertProduct, type Address, type InsertAddress,
   type CartItem, type InsertCartItem, type Order, type InsertOrder,
@@ -9,7 +11,17 @@ import {
   type UserSettings, type InsertUserSettings,
   type RefreshToken, type InsertRefreshToken,
   type PasswordResetToken, type InsertPasswordResetToken,
-  type LoginSession, type InsertLoginSession
+  type LoginSession, type InsertLoginSession,
+  type AdminRole, type InsertAdminRole,
+  type AdminUser, type InsertAdminUser,
+  type SystemConfig, type InsertSystemConfig,
+  type AuditLog, type InsertAuditLog,
+  type Content, type InsertContent,
+  type Media, type InsertMedia,
+  type UserActivity, type InsertUserActivity,
+  type SecurityLog, type InsertSecurityLog,
+  type IpBlacklist, type InsertIpBlacklist,
+  type BackupLog, type InsertBackupLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
@@ -118,6 +130,154 @@ export interface IStorage {
   createReview(review: InsertReview): Promise<Review>;
   updateReview(id: string, review: Partial<InsertReview>): Promise<Review>;
   deleteReview(id: string): Promise<void>;
+
+  // Admin Management
+  createAdminUser(userId: string, adminData: InsertAdminUser): Promise<AdminUser>;
+  getAdminUser(userId: string): Promise<AdminUser | undefined>;
+  updateAdminUser(userId: string, adminData: Partial<InsertAdminUser>): Promise<AdminUser>;
+  deleteAdminUser(userId: string): Promise<void>;
+  getAdminUsers(): Promise<(AdminUser & { user: User })[]>;
+
+  // Roles & Permissions
+  createRole(role: InsertAdminRole): Promise<AdminRole>;
+  getRoles(): Promise<AdminRole[]>;
+  getRole(id: string): Promise<AdminRole | undefined>;
+  updateRole(id: string, role: Partial<InsertAdminRole>): Promise<AdminRole>;
+  deleteRole(id: string): Promise<void>;
+  getPermissions(): Promise<any[]>;
+  assignRoleToUser(userId: string, roleId: string): Promise<void>;
+  removeRoleFromUser(userId: string, roleId: string): Promise<void>;
+
+  // User Management (Admin)
+  getAllUsers(params?: {
+    search?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }): Promise<{ users: User[]; total: number }>;
+  suspendUser(userId: string, reason?: string, suspendedBy?: string): Promise<User>;
+  unsuspendUser(userId: string): Promise<User>;
+  banUser(userId: string, reason?: string, bannedBy?: string): Promise<User>;
+  resetUserPassword(userId: string, newPassword: string): Promise<void>;
+  getUserActivity(userId: string): Promise<UserActivity[]>;
+  getUserSessions(userId: string): Promise<LoginSession[]>;
+  deleteUserSession(sessionId: string): Promise<void>;
+
+  // Content Management
+  getContent(params?: {
+    type?: string;
+    status?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ content: Content[]; total: number }>;
+  getContentById(id: string): Promise<Content | undefined>;
+  createContent(content: InsertContent): Promise<Content>;
+  updateContent(id: string, content: Partial<InsertContent>): Promise<Content>;
+  deleteContent(id: string): Promise<void>;
+  publishContent(id: string): Promise<Content>;
+  unpublishContent(id: string): Promise<Content>;
+
+  // Media Management
+  getMedia(params?: {
+    search?: string;
+    mimeType?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ media: Media[]; total: number }>;
+  getMediaById(id: string): Promise<Media | undefined>;
+  createMedia(media: InsertMedia): Promise<Media>;
+  deleteMedia(id: string): Promise<void>;
+  getStorageUsage(): Promise<{ totalSize: number; totalFiles: number }>;
+
+  // System Configuration
+  getSystemConfig(): Promise<SystemConfig[]>;
+  getSystemConfigByKey(category: string, key: string): Promise<SystemConfig | undefined>;
+  updateSystemConfig(category: string, key: string, value: any, updatedBy: string): Promise<SystemConfig>;
+  clearCache(): Promise<void>;
+
+  // Audit Logs
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(params?: {
+    action?: string;
+    resource?: string;
+    actorId?: string;
+    severity?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ logs: AuditLog[]; total: number }>;
+  getAuditLog(id: string): Promise<AuditLog | undefined>;
+
+  // Security Monitoring
+  createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
+  getSecurityLogs(params?: {
+    type?: string;
+    severity?: string;
+    resolved?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ logs: SecurityLog[]; total: number }>;
+  getFailedLogins(params?: {
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ logs: SecurityLog[]; total: number }>;
+  addToIpBlacklist(ipAddress: string, reason?: string, createdBy?: string): Promise<IpBlacklist>;
+  removeFromIpBlacklist(ipAddress: string): Promise<void>;
+  getIpBlacklist(): Promise<IpBlacklist[]>;
+  resolveSecurityThreat(id: string, resolvedBy: string): Promise<SecurityLog>;
+
+  // Analytics & Dashboard
+  getDashboardOverview(): Promise<{
+    totalUsers: number;
+    totalActiveUsers: number;
+    totalOrders: number;
+    totalRevenue: number;
+    newUsersToday: number;
+    ordersToday: number;
+    revenueToday: number;
+  }>;
+  getUserMetrics(params?: {
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{
+    newUsers: number;
+    activeUsers: number;
+    userGrowth: number;
+  }>;
+  getContentMetrics(): Promise<{
+    totalContent: number;
+    publishedContent: number;
+    draftContent: number;
+    totalViews: number;
+  }>;
+  getSystemHealth(): Promise<{
+    databaseConnections: number;
+    serverUptime: number;
+    memoryUsage: number;
+    diskUsage: number;
+  }>;
+
+  // Bulk Operations
+  bulkUpdateUsers(userIds: string[], operation: string, data?: any): Promise<void>;
+  bulkDeleteUsers(userIds: string[]): Promise<void>;
+  exportUsers(params?: any): Promise<any[]>;
+
+  // System Operations
+  createBackup(type: string, triggeredBy: string): Promise<BackupLog>;
+  getBackups(): Promise<BackupLog[]>;
+  getSystemLogs(params?: {
+    level?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {

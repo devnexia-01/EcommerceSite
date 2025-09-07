@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, integer, boolean, timestamp, jsonb, uuid, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, integer, boolean, timestamp, jsonb, uuid, date, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -442,6 +442,338 @@ export const verifyEmailSchema = z.object({
 export const enable2FASchema = z.object({
   code: z.string().length(6)
 });
+
+// Admin roles table
+export const adminRoles = pgTable("admin_roles", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  permissions: jsonb("permissions").$type<string[]>().default([]),
+  isSystem: boolean("is_system").default(false),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Admin permissions table
+export const adminPermissions = pgTable("admin_permissions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  resource: text("resource").notNull(), // users, products, orders, etc.
+  action: text("action").notNull(), // create, read, update, delete, manage
+  description: text("description")
+});
+
+// Admin users table (enhanced admins)
+export const adminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  roles: jsonb("roles").$type<string[]>().default([]),
+  permissions: jsonb("permissions").$type<string[]>().default([]),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// System configuration table
+export const systemConfig = pgTable("system_config", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: text("category").notNull(),
+  key: text("key").notNull(),
+  value: jsonb("value"),
+  type: text("type").notNull(), // string, number, boolean, object, array
+  description: text("description"),
+  isPublic: boolean("is_public").default(false),
+  validation: jsonb("validation").$type<{
+    required?: boolean;
+    pattern?: string;
+    min?: number;
+    max?: number;
+  }>(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+  updatedBy: uuid("updated_by").references(() => users.id)
+});
+
+// Audit logs table
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  action: text("action").notNull(),
+  resource: text("resource").notNull(),
+  resourceId: uuid("resource_id"),
+  actorId: uuid("actor_id"),
+  actorType: text("actor_type").notNull(), // admin, user, system
+  actorName: text("actor_name"),
+  changes: jsonb("changes").$type<{
+    before?: any;
+    after?: any;
+  }>(),
+  context: jsonb("context").$type<{
+    ipAddress?: string;
+    userAgent?: string;
+    sessionId?: string;
+  }>(),
+  severity: text("severity").default("low"), // low, medium, high, critical
+  category: text("category"),
+  timestamp: timestamp("timestamp").default(sql`now()`)
+});
+
+// Content management table (for CMS functionality)
+export const content = pgTable("content", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  type: text("type").notNull(), // article, page, product, media
+  status: text("status").default("draft"), // draft, published, archived
+  body: text("body"),
+  excerpt: text("excerpt"),
+  featuredImage: text("featured_image"),
+  metadata: jsonb("metadata"),
+  seoMetaTitle: text("seo_meta_title"),
+  seoMetaDescription: text("seo_meta_description"),
+  seoKeywords: jsonb("seo_keywords").$type<string[]>().default([]),
+  categories: jsonb("categories").$type<string[]>().default([]),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  authorId: uuid("author_id").references(() => users.id),
+  publishedAt: timestamp("published_at"),
+  scheduledAt: timestamp("scheduled_at"),
+  expiresAt: timestamp("expires_at"),
+  viewCount: integer("view_count").default(0),
+  version: integer("version").default(1),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Media management table
+export const media = pgTable("media", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename").notNull(),
+  originalFilename: text("original_filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(), // in bytes
+  url: text("url").notNull(),
+  alt: text("alt"),
+  caption: text("caption"),
+  metadata: jsonb("metadata"),
+  uploadedBy: uuid("uploaded_by").references(() => users.id),
+  createdAt: timestamp("created_at").default(sql`now()`)
+});
+
+// User activity/statistics tracking (for admin dashboard)
+export const userActivity = pgTable("user_activity", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(), // login, logout, purchase, view_product, etc.
+  resource: text("resource"), // product_id, page_url, etc.
+  metadata: jsonb("metadata"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").default(sql`now()`)
+});
+
+// Security monitoring table
+export const securityLogs = pgTable("security_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // failed_login, suspicious_activity, etc.
+  severity: text("severity").notNull(), // low, medium, high, critical
+  description: text("description").notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata"),
+  resolved: boolean("resolved").default(false),
+  resolvedBy: uuid("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  timestamp: timestamp("timestamp").default(sql`now()`)
+});
+
+// IP blacklist table
+export const ipBlacklist = pgTable("ip_blacklist", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipAddress: text("ip_address").notNull().unique(),
+  reason: text("reason"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").default(sql`now()`)
+});
+
+// System backup logs
+export const backupLogs = pgTable("backup_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // full, incremental
+  status: text("status").notNull(), // pending, running, completed, failed
+  size: bigint("size", { mode: "number" }),
+  location: text("location"),
+  startedAt: timestamp("started_at").default(sql`now()`),
+  completedAt: timestamp("completed_at"),
+  error: text("error"),
+  triggeredBy: uuid("triggered_by").references(() => users.id)
+});
+
+// Relations for new tables
+export const adminRolesRelations = relations(adminRoles, ({ many }) => ({
+  adminUsers: many(adminUsers)
+}));
+
+export const adminUsersRelations = relations(adminUsers, ({ one }) => ({
+  user: one(users, {
+    fields: [adminUsers.userId],
+    references: [users.id]
+  })
+}));
+
+export const contentRelations = relations(content, ({ one }) => ({
+  author: one(users, {
+    fields: [content.authorId],
+    references: [users.id]
+  })
+}));
+
+export const mediaRelations = relations(media, ({ one }) => ({
+  uploadedBy: one(users, {
+    fields: [media.uploadedBy],
+    references: [users.id]
+  })
+}));
+
+export const userActivityRelations = relations(userActivity, ({ one }) => ({
+  user: one(users, {
+    fields: [userActivity.userId],
+    references: [users.id]
+  })
+}));
+
+export const securityLogsRelations = relations(securityLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [securityLogs.userId],
+    references: [users.id]
+  }),
+  resolvedBy: one(users, {
+    fields: [securityLogs.resolvedBy],
+    references: [users.id]
+  })
+}));
+
+// Schemas for new tables
+export const insertAdminRoleSchema = createInsertSchema(adminRoles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true
+});
+
+export const insertContentSchema = createInsertSchema(content).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertMediaSchema = createInsertSchema(media).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertUserActivitySchema = createInsertSchema(userActivity).omit({
+  id: true,
+  timestamp: true
+});
+
+export const insertSecurityLogSchema = createInsertSchema(securityLogs).omit({
+  id: true,
+  timestamp: true
+});
+
+export const insertIpBlacklistSchema = createInsertSchema(ipBlacklist).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertBackupLogSchema = createInsertSchema(backupLogs).omit({
+  id: true,
+  startedAt: true
+});
+
+// Admin validation schemas
+export const adminLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+  twoFactorCode: z.string().length(6).optional()
+});
+
+export const createAdminUserSchema = z.object({
+  email: z.string().email(),
+  username: z.string().min(3).max(50),
+  password: z.string().min(8).max(100),
+  firstName: z.string().min(1).max(50),
+  lastName: z.string().min(1).max(50),
+  roles: z.array(z.string()).default([]),
+  permissions: z.array(z.string()).default([])
+});
+
+export const updateUserStatusSchema = z.object({
+  status: z.enum(["active", "suspended", "banned", "pending"]),
+  reason: z.string().optional()
+});
+
+export const bulkUserOperationSchema = z.object({
+  userIds: z.array(z.string()),
+  operation: z.enum(["activate", "suspend", "delete", "export"]),
+  reason: z.string().optional()
+});
+
+export const systemConfigUpdateSchema = z.object({
+  category: z.string(),
+  key: z.string(),
+  value: z.any(),
+  type: z.enum(["string", "number", "boolean", "object", "array"]),
+  description: z.string().optional(),
+  isPublic: z.boolean().default(false)
+});
+
+// Types for new tables
+export type AdminRole = typeof adminRoles.$inferSelect;
+export type InsertAdminRole = z.infer<typeof insertAdminRoleSchema>;
+
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type Content = typeof content.$inferSelect;
+export type InsertContent = z.infer<typeof insertContentSchema>;
+
+export type Media = typeof media.$inferSelect;
+export type InsertMedia = z.infer<typeof insertMediaSchema>;
+
+export type UserActivity = typeof userActivity.$inferSelect;
+export type InsertUserActivity = z.infer<typeof insertUserActivitySchema>;
+
+export type SecurityLog = typeof securityLogs.$inferSelect;
+export type InsertSecurityLog = z.infer<typeof insertSecurityLogSchema>;
+
+export type IpBlacklist = typeof ipBlacklist.$inferSelect;
+export type InsertIpBlacklist = z.infer<typeof insertIpBlacklistSchema>;
+
+export type BackupLog = typeof backupLogs.$inferSelect;
+export type InsertBackupLog = z.infer<typeof insertBackupLogSchema>;
 
 // Types
 export type User = typeof users.$inferSelect;
