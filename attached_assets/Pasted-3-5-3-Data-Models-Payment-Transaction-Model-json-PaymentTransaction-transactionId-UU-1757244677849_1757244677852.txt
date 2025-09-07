@@ -1,0 +1,206 @@
+3.5.3 Data Models
+Payment Transaction Model
+json{
+  "PaymentTransaction": {
+    "transactionId": "UUID",
+    "orderId": "UUID",
+    "userId": "UUID",
+    "type": "enum[payment|refund|authorization|capture|void]",
+    "status": "enum[pending|processing|success|failed|cancelled|expired]",
+    "amount": "decimal",
+    "currency": "string",
+    "gateway": "enum[stripe|paypal|square|authorize_net|braintree]",
+    "gatewayTransactionId": "string",
+    "paymentMethod": {
+      "methodId": "UUID",
+      "type": "enum[credit_card|debit_card|paypal|apple_pay|google_pay|bank_transfer]",
+      "last4": "string",
+      "brand": "string",
+      "expiryMonth": "integer",
+      "expiryYear": "integer"
+    },
+    "fees": {
+      "processingFee": "decimal",
+      "gatewayFee": "decimal",
+      "totalFee": "decimal"
+    },
+    "fraud": {
+      "riskScore": "decimal",
+      "status": "enum[passed|flagged|blocked]",
+      "checks": {
+        "cvv": "enum[pass|fail|unavailable]",
+        "address": "enum[pass|fail|unavailable]",
+        "postal": "enum[pass|fail|unavailable]"
+      }
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "processedAt": "timestamp",
+      "failureReason": "string",
+      "ipAddress": "string",
+      "userAgent": "string"
+    }
+  }
+}
+Payment Method Model
+json{
+  "PaymentMethod": {
+    "methodId": "UUID",
+    "userId": "UUID",
+    "type": "enum[credit_card|debit_card|paypal|apple_pay|google_pay|bank_account]",
+    "isDefault": "boolean",
+    "isActive": "boolean",
+    "card": {
+      "last4": "string",
+      "brand": "enum[visa|mastercard|amex|discover|jcb|diners]",
+      "expiryMonth": "integer",
+      "expiryYear": "integer",
+      "holderName": "string",
+      "fingerprint": "string",
+      "issuer": "string",
+      "country": "string",
+      "fundingType": "enum[credit|debit|prepaid|unknown]"
+    },
+    "billingAddress": {
+      "firstName": "string",
+      "lastName": "string",
+      "streetAddress": "string",
+      "city": "string",
+      "state": "string",
+      "zipCode": "string",
+      "country": "string"
+    },
+    "gateway": {
+      "provider": "string",
+      "customerId": "string",
+      "tokenId": "string"
+    },
+    "verification": {
+      "verified": "boolean",
+      "verifiedAt": "timestamp",
+      "verificationMethod": "string"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "lastUsed": "timestamp",
+      "usageCount": "integer"
+    }
+  }
+}
+Refund Model
+json{
+  "Refund": {
+    "refundId": "UUID",
+    "originalTransactionId": "UUID",
+    "orderId": "UUID",
+    "amount": "decimal",
+    "currency": "string",
+    "reason": "enum[requested_by_customer|duplicate|fraudulent|subscription_cancellation|other]",
+    "status": "enum[pending|processing|succeeded|failed|cancelled]",
+    "type": "enum[full|partial]",
+    "gateway": {
+      "provider": "string",
+      "refundId": "string",
+      "fee": "decimal"
+    },
+    "timeline": [{
+      "status": "string",
+      "timestamp": "timestamp",
+      "note": "string"
+    }],
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "processedAt": "timestamp",
+      "requestedBy": "UUID",
+      "failureReason": "string"
+    }
+  }
+}
+3D Secure Authentication Model
+json{
+  "ThreeDSecure": {
+    "authenticationId": "UUID",
+    "transactionId": "UUID",
+    "status": "enum[required|authenticated|failed|bypassed|unavailable]",
+    "version": "enum[1.0|2.0|2.1|2.2]",
+    "authenticationValue": "string",
+    "cavv": "string",
+    "eci": "string",
+    "dsTransId": "string",
+    "acsTransId": "string",
+    "challengeRequired": "boolean",
+    "liabilityShift": "boolean",
+    "enrollmentStatus": "enum[Y|N|U]",
+    "authenticationStatus": "enum[Y|N|U|A|C|R]",
+    "metadata": {
+      "createdAt": "timestamp",
+      "completedAt": "timestamp",
+      "redirectUrl": "string"
+    }
+  }
+}
+Wallet Payment Model
+json{
+  "WalletPayment": {
+    "walletPaymentId": "UUID",
+    "transactionId": "UUID",
+    "walletType": "enum[apple_pay|google_pay|samsung_pay|paypal]",
+    "deviceData": {
+      "deviceId": "string",
+      "merchantId": "string",
+      "paymentData": "string",
+      "signature": "string"
+    },
+    "billingContact": {
+      "name": "string",
+      "email": "string",
+      "phone": "string"
+    },
+    "shippingContact": {
+      "name": "string",
+      "email": "string",
+      "phone": "string",
+      "address": "object"
+    },
+    "verification": {
+      "status": "enum[verified|failed|pending]",
+      "method": "string",
+      "timestamp": "timestamp"
+    }
+  }
+}
+Payment Gateway Configuration Model
+json{
+  "PaymentGateway": {
+    "gatewayId": "UUID",
+    "provider": "enum[stripe|paypal|square|authorize_net|braintree]",
+    "environment": "enum[sandbox|production]",
+    "isActive": "boolean",
+    "configuration": {
+      "merchantId": "string",
+      "publicKey": "string",
+      "webhookUrl": "string",
+      "supportedMethods": ["string[]"],
+      "supportedCurrencies": ["string[]"]
+    },
+    "limits": {
+      "minAmount": "decimal",
+      "maxAmount": "decimal",
+      "dailyLimit": "decimal",
+      "monthlyLimit": "decimal"
+    },
+    "fees": {
+      "percentage": "decimal",
+      "fixed": "decimal",
+      "internationalFee": "decimal"
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp",
+      "lastHealthCheck": "timestamp"
+    }
+  }
+}
