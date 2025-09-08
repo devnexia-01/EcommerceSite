@@ -824,12 +824,31 @@ export function setupV1Routes(app: any, storage: any) {
         
         // Create order items if provided
         if (req.body.items && Array.isArray(req.body.items)) {
-          const orderItemsData = req.body.items.map((item: any) => ({
-            ...item,
-            orderId: newOrder.id
-          }));
-          
-          await tx.insert(orderItems).values(orderItemsData);
+          for (const item of req.body.items) {
+            // Get product details for order item
+            const [product] = await tx.select().from(products).where(eq(products.id, item.productId));
+            
+            if (!product) {
+              throw new Error(`Product not found: ${item.productId}`);
+            }
+            
+            const unitPrice = parseFloat(item.price);
+            const totalPrice = unitPrice * item.quantity;
+            
+            await tx.insert(orderItems).values({
+              orderId: newOrder.id,
+              productId: item.productId,
+              sku: product.sku || `SKU-${Date.now()}`,
+              name: product.name,
+              description: product.description,
+              quantity: item.quantity,
+              unitPrice: unitPrice.toFixed(2),
+              totalPrice: totalPrice.toFixed(2),
+              price: unitPrice.toFixed(2),
+              total: totalPrice.toFixed(2),
+              status: "pending"
+            });
+          }
         }
 
         // Create initial status history
