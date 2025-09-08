@@ -51,15 +51,23 @@ export default function Checkout() {
       email: user?.email || "",
       firstName: user?.firstName || "",
       lastName: user?.lastName || "",
+      streetAddress: "",
+      city: "",
+      state: "",
+      zipCode: "",
       country: "US",
       shippingMethod: "standard",
-      sameAsBilling: true
+      sameAsBilling: true,
+      cardNumber: "",
+      expiryDate: "",
+      cvv: "",
+      cardholderName: ""
     }
   });
 
   const orderMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/orders", data);
+      const response = await apiRequest("POST", "/api/v1/orders", data);
       return response.json();
     },
     onSuccess: (order) => {
@@ -125,26 +133,26 @@ export default function Checkout() {
   const total = subtotal + shipping + tax;
 
   const onSubmit = async (data: CheckoutFormData) => {
+    const addressData = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      streetAddress: data.streetAddress,
+      city: data.city,
+      state: data.state,
+      zipCode: data.zipCode,
+      country: data.country
+    };
+
     const orderData = {
-      subtotal: subtotal.toFixed(2),
-      shipping: shipping.toFixed(2),
-      tax: tax.toFixed(2),
-      total: total.toFixed(2),
-      shippingAddress: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        streetAddress: data.streetAddress,
-        city: data.city,
-        state: data.state,
-        zipCode: data.zipCode,
-        country: data.country
-      },
-      orderItems: items.map(item => ({
+      items: items.map(item => ({
         productId: item.productId,
         quantity: item.quantity,
-        price: item.product.price,
-        total: (parseFloat(item.product.price) * item.quantity).toFixed(2)
-      }))
+        price: item.product.price
+      })),
+      shippingAddress: addressData,
+      billingAddress: data.sameAsBilling ? addressData : addressData, // For now, use same address
+      shippingMethod: data.shippingMethod,
+      currency: "USD"
     };
 
     await orderMutation.mutateAsync(orderData);
