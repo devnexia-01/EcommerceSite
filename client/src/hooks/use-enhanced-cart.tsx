@@ -74,6 +74,18 @@ function useCartLogic(): UseCartReturn {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get or create session ID
+  const getSessionId = useCallback(() => {
+    if (user) return null; // Don't use session ID if user is logged in
+    
+    let sessionId = localStorage.getItem('cart-session-id');
+    if (!sessionId) {
+      sessionId = 'session-' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('cart-session-id', sessionId);
+    }
+    return sessionId;
+  }, [user]);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -120,12 +132,8 @@ function useCartLogic(): UseCartReturn {
     };
 
     // Add session ID if no user
-    if (!user) {
-      let sessionId = localStorage.getItem('cart-session-id');
-      if (!sessionId) {
-        sessionId = 'session-' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('cart-session-id', sessionId);
-      }
+    const sessionId = getSessionId();
+    if (sessionId) {
       headers['x-session-id'] = sessionId;
     }
 
@@ -148,7 +156,7 @@ function useCartLogic(): UseCartReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, getSessionId]);
 
   // Load cart on mount and when user changes
   useEffect(() => {
@@ -169,6 +177,8 @@ function useCartLogic(): UseCartReturn {
           title: "Added to cart",
           description: "Item has been added to your cart",
         });
+        // Refresh cart immediately after adding item
+        await refreshCart();
         return true;
       } else {
         const errorData = await response.json();
