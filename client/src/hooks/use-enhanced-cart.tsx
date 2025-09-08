@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
 import { io, Socket } from 'socket.io-client';
@@ -46,7 +46,30 @@ interface UseCartReturn {
 
 let socket: Socket | null = null;
 
+// Create Cart Context
+const CartContext = createContext<UseCartReturn | undefined>(undefined);
+
+// Cart Provider Component
+export function EnhancedCartProvider({ children }: { children: React.ReactNode }) {
+  const cartValue = useCartLogic();
+  return (
+    <CartContext.Provider value={cartValue}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+// Hook to use cart context
 export function useCart(): UseCartReturn {
+  const context = useContext(CartContext);
+  if (context === undefined) {
+    throw new Error('useCart must be used within an EnhancedCartProvider');
+  }
+  return context;
+}
+
+// Main cart logic
+function useCartLogic(): UseCartReturn {
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
