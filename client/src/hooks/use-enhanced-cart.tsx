@@ -1,457 +1,280 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "./use-auth";
-import { useToast } from "./use-toast";
-import { io, Socket } from "socket.io-client";
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './use-auth';
+import { useToast } from './use-toast';
+import { io, Socket } from 'socket.io-client';
 
-// Enhanced Cart Types
-interface Product {
-  id: string;
-  name: string;
-  price: string;
-  imageUrl: string | null;
-  stock: number;
-}
-
-interface CartCustomization {
-  engraving?: string;
-  giftWrap?: boolean;
-  giftMessage?: string;
-  color?: string;
-  size?: string;
-  [key: string]: any;
-}
-
-interface EnhancedCartItem {
+interface CartItem {
   id: string;
   cartId: string;
   productId: string;
-  variantId?: string;
   quantity: number;
   price: string;
-  discount: string;
-  customization?: CartCustomization;
   addedAt: Date;
-  savedForLater: boolean;
-  product: Product;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    price: string;
+    imageUrl: string;
+    stock: number;
+  };
 }
 
-interface CartSummary {
+interface Cart {
+  id: string;
+  userId?: string;
+  sessionId?: string;
+  items: CartItem[];
   subtotal: string;
   tax: string;
   shipping: string;
-  discount: string;
   total: string;
 }
 
-interface CartCoupon {
-  id: string;
-  code: string;
-  discount: string;
-  type: string;
-  discountAmount: string;
-}
-
-interface CartValidation {
-  isValid: boolean;
-  issues: Array<{
-    itemId: string;
-    issue: string;
-    severity: 'warning' | 'error';
-  }>;
-}
-
-interface EnhancedCart {
-  id: string | null;
-  userId?: string;
-  sessionId?: string;
-  items: EnhancedCartItem[];
-  summary: CartSummary;
-  coupons: CartCoupon[];
-  metadata: {
-    createdAt: Date;
-    updatedAt: Date;
-    expiresAt?: Date;
-    abandoned: boolean;
-  };
-  currency: string;
-  notes?: string;
-}
-
-interface EnhancedCartContextType {
-  cart: EnhancedCart | null;
-  isLoading: boolean;
-  
-  // Basic cart operations
-  addToCart: (productId: string, options?: {
-    quantity?: number;
-    variantId?: string;
-    price?: string;
-    customization?: CartCustomization;
-  }) => Promise<void>;
-  updateCartItem: (itemId: string, updates: {
-    quantity?: number;
-    customization?: CartCustomization;
-    savedForLater?: boolean;
-  }) => Promise<void>;
-  removeFromCart: (itemId: string) => Promise<void>;
-  clearCart: () => Promise<void>;
-  
-  // Enhanced features
-  applyCoupon: (code: string) => Promise<void>;
-  removeCoupon: (couponId: string) => Promise<void>;
-  saveForLater: (itemIds: string[]) => Promise<void>;
-  moveToCart: (itemIds: string[]) => Promise<void>;
-  validateCart: () => Promise<CartValidation>;
-  
-  // Computed values
-  totalItems: number;
+interface UseCartReturn {
+  cart: Cart | null;
+  items: CartItem[];
+  itemCount: number;
   totalPrice: number;
-  cartValidation: CartValidation | null;
-  
-  // Real-time status
-  isConnected: boolean;
+  isLoading: boolean;
+  addToCart: (productId: string, quantity?: number) => Promise<boolean>;
+  updateQuantity: (itemId: string, quantity: number) => Promise<boolean>;
+  removeItem: (itemId: string) => Promise<boolean>;
+  clearCart: () => Promise<boolean>;
+  refreshCart: () => Promise<void>;
 }
 
-const EnhancedCartContext = createContext<EnhancedCartContextType | undefined>(undefined);
+let socket: Socket | null = null;
 
-export function EnhancedCartProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuth();
-  const queryClient = useQueryClient();
+export function useCart(): UseCartReturn {
+  const [cart, setCart] = useState<Cart | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [cartValidation, setCartValidation] = useState<CartValidation | null>(null);
-  
-  // Session ID for guest carts
-  const [sessionId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      let id = localStorage.getItem('cart-session-id');
-      if (!id) {
-        id = 'session-' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('cart-session-id', id);
-      }
-      return id;
-    }
-    return null;
-  });
-
-  // Get cart data
-  const { data: cart = null, isLoading } = useQuery({
-    queryKey: ["/api/v1/cart"],
-    queryFn: () => apiRequest("GET", "/api/v1/cart") as Promise<EnhancedCart>,
-    enabled: isAuthenticated || !!sessionId,
-    refetchOnWindowFocus: false
-  });
 
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!isAuthenticated && !sessionId) return;
-    
-    const newSocket = io(window.location.origin, {
-      transports: ['websocket', 'polling']
-    });
-
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-      // Join cart room for real-time updates
-      newSocket.emit('join-cart-room', {
-        userId: user?.id,
-        sessionId: sessionId
+    if (!socket) {
+      socket = io();
+      
+      socket.on('connect', () => {
+        console.log('Connected to WebSocket server');
       });
-    });
 
-    newSocket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    // Cart event listeners
-    newSocket.on('cart-updated', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    });
-
-    newSocket.on('cart-item-added', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    });
-
-    newSocket.on('cart-item-updated', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    });
-
-    newSocket.on('cart-item-removed', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    });
-
-    newSocket.on('cart-cleared', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    });
-
-    newSocket.on('coupon-applied', (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Coupon Applied",
-        description: `Coupon "${data.coupon?.code}" applied successfully!`
+      socket.on('cart-item-added', (data) => {
+        console.log('Cart item added:', data);
+        refreshCart();
       });
-    });
 
-    newSocket.on('coupon-removed', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    });
+      socket.on('cart-item-updated', (data) => {
+        console.log('Cart item updated:', data);
+        refreshCart();
+      });
 
-    newSocket.on('cart-validation', (data) => {
-      setCartValidation(data.validation);
-      if (data.validation && !data.validation.isValid) {
-        toast({
-          title: "Cart Issues Found",
-          description: "Some items in your cart need attention",
-          variant: "destructive"
-        });
-      }
-    });
+      socket.on('cart-item-removed', (data) => {
+        console.log('Cart item removed:', data);
+        refreshCart();
+      });
 
-    setSocket(newSocket);
+      socket.on('cart-updated', (data) => {
+        console.log('Cart updated:', data);
+        refreshCart();
+      });
+    }
 
     return () => {
-      newSocket.disconnect();
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
     };
-  }, [isAuthenticated, user?.id, sessionId, queryClient, toast]);
+  }, []);
 
-  // Mutations
-  const addToCartMutation = useMutation({
-    mutationFn: ({ productId, options = {} }: {
-      productId: string;
-      options?: {
-        quantity?: number;
-        variantId?: string;
-        price?: string;
-        customization?: CartCustomization;
-      };
-    }) => apiRequest("POST", "/api/v1/cart/items", {
-      productId,
-      quantity: options.quantity || 1,
-      variantId: options.variantId,
-      price: options.price,
-      customization: options.customization
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Success",
-        description: "Item added to cart"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add item to cart",
-        variant: "destructive"
-      });
+  // Get authorization headers
+  const getAuthHeaders = () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add session ID if no user
+    if (!user) {
+      headers['x-session-id'] = 'session-' + Math.random().toString(36).substr(2, 9);
     }
-  });
 
-  const updateCartItemMutation = useMutation({
-    mutationFn: ({ itemId, updates }: {
-      itemId: string;
-      updates: {
-        quantity?: number;
-        customization?: CartCustomization;
-        savedForLater?: boolean;
-      };
-    }) => apiRequest("PUT", `/api/v1/cart/items/${itemId}`, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update cart item",
-        variant: "destructive"
-      });
-    }
-  });
+    return headers;
+  };
 
-  const removeFromCartMutation = useMutation({
-    mutationFn: (itemId: string) => apiRequest("DELETE", `/api/v1/cart/items/${itemId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Success",
-        description: "Item removed from cart"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to remove item",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const clearCartMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/v1/cart/clear"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Success",
-        description: "Cart cleared"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to clear cart",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const applyCouponMutation = useMutation({
-    mutationFn: (code: string) => apiRequest("POST", "/api/v1/cart/coupons", { code }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to apply coupon",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const removeCouponMutation = useMutation({
-    mutationFn: (couponId: string) => apiRequest("DELETE", `/api/v1/cart/coupons/${couponId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Success",
-        description: "Coupon removed"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to remove coupon",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const saveForLaterMutation = useMutation({
-    mutationFn: (itemIds: string[]) => apiRequest("POST", "/api/v1/cart/save-for-later", { itemIds }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Success",
-        description: "Items saved for later"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save items for later",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const moveToCartMutation = useMutation({
-    mutationFn: (itemIds: string[]) => apiRequest("POST", "/api/v1/cart/move-to-cart", { itemIds }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
-      toast({
-        title: "Success",
-        description: "Items moved to cart"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to move items to cart",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Validation
-  const validateCart = async (): Promise<CartValidation> => {
+  // Fetch cart data
+  const refreshCart = useCallback(async () => {
     try {
-      const response = await apiRequest("GET", "/api/v1/cart/validate") as any;
-      setCartValidation(response.validation);
-      return response.validation;
+      const response = await fetch('/api/v1/cart', {
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        const cartData = await response.json();
+        setCart(cartData);
+      }
     } catch (error) {
-      console.error("Cart validation failed:", error);
-      return { isValid: true, issues: [] };
+      console.error('Error fetching cart:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Load cart on mount and when user changes
+  useEffect(() => {
+    refreshCart();
+  }, [refreshCart]);
+
+  // Add item to cart
+  const addToCart = async (productId: string, quantity: number = 1): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/v1/cart/items', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ productId, quantity })
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Added to cart",
+          description: "Item has been added to your cart",
+        });
+        return true;
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to add item to cart",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive"
+      });
+      return false;
     }
   };
 
-  // Computed values
-  const totalItems = cart?.items?.filter((item: any) => !item.savedForLater)
-    .reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+  // Update item quantity
+  const updateQuantity = async (itemId: string, quantity: number): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/v1/cart/items/${itemId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ quantity })
+      });
 
-  const totalPrice = cart?.summary ? parseFloat(cart.summary.total) : 0;
-
-  const value: EnhancedCartContextType = {
-    cart,
-    isLoading,
-    addToCart: (productId: string, options = {}) => addToCartMutation.mutateAsync({ productId, options }),
-    updateCartItem: (itemId: string, updates: any) => updateCartItemMutation.mutateAsync({ itemId, updates }),
-    removeFromCart: (itemId: string) => removeFromCartMutation.mutateAsync(itemId),
-    clearCart: () => clearCartMutation.mutateAsync(),
-    applyCoupon: (code: string) => applyCouponMutation.mutateAsync(code),
-    removeCoupon: (couponId: string) => removeCouponMutation.mutateAsync(couponId),
-    saveForLater: (itemIds: string[]) => saveForLaterMutation.mutateAsync(itemIds),
-    moveToCart: (itemIds: string[]) => moveToCartMutation.mutateAsync(itemIds),
-    validateCart,
-    totalItems,
-    totalPrice,
-    cartValidation,
-    isConnected
+      if (response.ok) {
+        return true;
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to update quantity",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update quantity",
+        variant: "destructive"
+      });
+      return false;
+    }
   };
 
-  return (
-    <EnhancedCartContext.Provider value={value}>
-      {children}
-    </EnhancedCartContext.Provider>
-  );
-}
+  // Remove item from cart
+  const removeItem = async (itemId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/v1/cart/items/${itemId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
 
-export function useEnhancedCart() {
-  const context = useContext(EnhancedCartContext);
-  if (context === undefined) {
-    throw new Error("useEnhancedCart must be used within an EnhancedCartProvider");
-  }
-  return context;
-}
+      if (response.ok) {
+        toast({
+          title: "Removed from cart",
+          description: "Item has been removed from your cart",
+        });
+        return true;
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to remove item",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove item",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
 
-// Legacy compatibility - update existing useCart hook to use enhanced version
-export function useCart() {
-  const context = useContext(EnhancedCartContext);
-  if (context === undefined) {
-    throw new Error("useCart must be used within a CartProvider or EnhancedCartProvider");
-  }
-  
-  // Map enhanced cart to legacy interface for backward compatibility
-  const legacyItems = context.cart?.items?.filter((item: any) => !item.savedForLater).map((item: any) => ({
-    id: item.id,
-    userId: context.cart?.userId || '',
-    productId: item.productId,
-    quantity: item.quantity,
-    product: item.product
-  })) || [];
+  // Clear entire cart
+  const clearCart = async (): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/v1/cart', {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Cart cleared",
+          description: "All items have been removed from your cart",
+        });
+        return true;
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to clear cart",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear cart",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  const items = cart?.items || [];
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = parseFloat(cart?.subtotal || '0');
 
   return {
-    items: legacyItems,
-    isLoading: context.isLoading,
-    addToCart: (productId: string, quantity = 1) => 
-      context.addToCart(productId, { quantity }),
-    updateQuantity: (itemId: string, quantity: number) => 
-      context.updateCartItem(itemId, { quantity }),
-    removeItem: context.removeFromCart,
-    clearCart: context.clearCart,
-    totalItems: context.totalItems,
-    totalPrice: context.totalPrice
+    cart,
+    items,
+    itemCount,
+    totalPrice,
+    isLoading,
+    addToCart,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    refreshCart
   };
 }
