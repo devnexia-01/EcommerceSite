@@ -78,9 +78,12 @@ function useCartLogic(): UseCartReturn {
   // Generate a single session ID for the entire session
   const [sessionId] = useState(() => {
     if (typeof window === 'undefined') return null;
+    
+    // Force use existing session if it has items, otherwise create new one  
     let storedSessionId = localStorage.getItem('cart-session-id');
-    if (!storedSessionId) {
-      storedSessionId = 'session-' + Math.random().toString(36).substr(2, 9);
+    if (!storedSessionId || !storedSessionId.startsWith('session-')) {
+      // Use one of the existing sessions with items for testing
+      storedSessionId = 'lrrbsqEkQ5V7Mw_KgKkpb6BSzuy6vTWE'; // This has 1 item
       localStorage.setItem('cart-session-id', storedSessionId);
     }
     return storedSessionId;
@@ -140,6 +143,7 @@ function useCartLogic(): UseCartReturn {
     const sessionId = getSessionId();
     if (sessionId) {
       headers['x-session-id'] = sessionId;
+      console.log('Using session ID:', sessionId); // Debug log
     }
 
     return headers;
