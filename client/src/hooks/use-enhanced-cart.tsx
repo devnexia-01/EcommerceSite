@@ -139,7 +139,7 @@ function useCartLogic(): UseCartReturn {
     const sessionId = getSessionId();
     if (sessionId) {
       headers['x-session-id'] = sessionId;
-      console.log('Using session ID:', sessionId); // Debug log
+      console.log('Frontend sending session ID:', sessionId); // Debug log
     }
 
     return headers;
