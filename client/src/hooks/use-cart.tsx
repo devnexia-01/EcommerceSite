@@ -38,7 +38,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading } = useQuery<CartItem[]>({
     queryKey: ["/api/cart"],
     enabled: isAuthenticated,
     refetchOnWindowFocus: false
@@ -115,12 +115,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value: CartContextType = {
     items,
     isLoading,
-    addToCart: (productId: string, quantity = 1) => 
-      addToCartMutation.mutateAsync({ productId, quantity }),
-    updateQuantity: (itemId: string, quantity: number) =>
-      updateQuantityMutation.mutateAsync({ itemId, quantity }),
-    removeItem: removeItemMutation.mutateAsync,
-    clearCart: clearCartMutation.mutateAsync,
+    addToCart: async (productId: string, quantity = 1) => {
+      await addToCartMutation.mutateAsync({ productId, quantity });
+    },
+    updateQuantity: async (itemId: string, quantity: number) => {
+      await updateQuantityMutation.mutateAsync({ itemId, quantity });
+    },
+    removeItem: async (itemId: string) => {
+      await removeItemMutation.mutateAsync(itemId);
+    },
+    clearCart: async () => {
+      await clearCartMutation.mutateAsync();
+    },
     totalItems,
     totalPrice
   };

@@ -37,14 +37,12 @@ export function useWishlist() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInWishlist, setIsInWishlist] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  const { user, getToken } = useAuth();
+  const { user } = useAuth();
 
   // Get authorization headers
   const getAuthHeaders = () => {
-    const token = getToken();
     return {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
     };
   };
 
