@@ -9,7 +9,7 @@ const router = Router();
 // Get user's wishlists
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     
     const userWishlists = await db
       .select({
@@ -35,7 +35,7 @@ router.get("/", authenticateToken, async (req, res) => {
 // Get default wishlist for user
 router.get("/default", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     
     let defaultWishlist = await db
       .select()
@@ -67,7 +67,7 @@ router.get("/default", authenticateToken, async (req, res) => {
 // Get wishlist items
 router.get("/:wishlistId/items", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { wishlistId } = req.params;
     
     // Verify wishlist belongs to user
@@ -113,7 +113,7 @@ router.get("/:wishlistId/items", authenticateToken, async (req, res) => {
 // Add item to wishlist
 router.post("/:wishlistId/items", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { wishlistId } = req.params;
     const { productId, notes } = req.body;
 
@@ -174,7 +174,7 @@ router.post("/:wishlistId/items", authenticateToken, async (req, res) => {
 // Add to default wishlist (simplified endpoint)
 router.post("/default/items", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { productId, notes } = req.body;
 
     if (!productId) {
@@ -232,7 +232,7 @@ router.post("/default/items", authenticateToken, async (req, res) => {
 // Remove item from wishlist
 router.delete("/:wishlistId/items/:itemId", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { wishlistId, itemId } = req.params;
 
     // Verify wishlist belongs to user
@@ -266,7 +266,7 @@ router.delete("/:wishlistId/items/:itemId", authenticateToken, async (req, res) 
 // Remove product from default wishlist by product ID
 router.delete("/default/items/product/:productId", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { productId } = req.params;
 
     // Get default wishlist
@@ -300,7 +300,7 @@ router.delete("/default/items/product/:productId", authenticateToken, async (req
 // Check if product is in user's default wishlist
 router.get("/default/items/product/:productId", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { productId } = req.params;
 
     // Get default wishlist
