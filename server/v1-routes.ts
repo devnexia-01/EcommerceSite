@@ -811,8 +811,25 @@ export function setupV1Routes(app: any, storage: any) {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      const orderData = insertOrderSchema.parse({
+      // Clean and validate the request body
+      const cleanedBody = {
         ...req.body,
+        shippingAddress: {
+          ...req.body.shippingAddress,
+          company: req.body.shippingAddress?.company || undefined,
+          streetAddress2: req.body.shippingAddress?.streetAddress2 || undefined,
+          phone: req.body.shippingAddress?.phone || undefined
+        },
+        billingAddress: {
+          ...req.body.billingAddress,
+          company: req.body.billingAddress?.company || undefined,
+          streetAddress2: req.body.billingAddress?.streetAddress2 || undefined,
+          phone: req.body.billingAddress?.phone || undefined
+        }
+      };
+
+      const orderData = insertOrderSchema.parse({
+        ...cleanedBody,
         userId,
         orderNumber: generateOrderNumber()
       });
