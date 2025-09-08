@@ -45,10 +45,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
     try {
       await addToCart(product.id);
-      toast({
-        title: "Added to cart",
-        description: `${product.name} has been added to your cart`,
-      });
+      // Toast notification is handled by the cart hook
     } catch (error) {
       toast({
         title: "Error",
