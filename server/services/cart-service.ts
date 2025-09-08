@@ -337,7 +337,12 @@ export class EnhancedCartService {
     await this.recalculateCartTotals(cartItem.cartId);
 
     // Get cart info for WebSocket events
-    const cart = await this.getCart(undefined, undefined);
+    const [cart] = await db
+      .select()
+      .from(carts)
+      .where(eq(carts.id, cartItem.cartId))
+      .limit(1);
+    
     const websocketService = WebSocketService.getInstance();
     websocketService.emitCartItemUpdated(cart?.userId, cart?.sessionId, cartItem);
     websocketService.emitCartUpdate(cart?.userId, cart?.sessionId);
@@ -368,6 +373,13 @@ export class EnhancedCartService {
       throw new Error("Cart item not found");
     }
 
+    // Get cart info before deletion for WebSocket events
+    const [cart] = await db
+      .select()
+      .from(carts)
+      .where(eq(carts.id, cartItem.cartId))
+      .limit(1);
+
     await db
       .delete(enhancedCartItems)
       .where(eq(enhancedCartItems.id, itemId));
@@ -375,8 +387,7 @@ export class EnhancedCartService {
     // Recalculate cart totals
     await this.recalculateCartTotals(cartItem.cartId);
 
-    // Get cart info for WebSocket events
-    const cart = await this.getCart(undefined, undefined);
+    // Emit WebSocket events with correct user/session info
     const websocketService = WebSocketService.getInstance();
     websocketService.emitCartItemRemoved(cart?.userId, cart?.sessionId, itemId);
     websocketService.emitCartUpdate(cart?.userId, cart?.sessionId);

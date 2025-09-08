@@ -110,6 +110,77 @@ router.get("/:wishlistId/items", authenticateToken, async (req, res) => {
   }
 });
 
+// Add item to default wishlist (special route)
+router.post("/default/items", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { productId, notes } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({ error: "Product ID is required" });
+    }
+
+    // Get or create default wishlist
+    let defaultWishlist = await db
+      .select()
+      .from(wishlists)
+      .where(and(eq(wishlists.userId, userId), eq(wishlists.isDefault, true)))
+      .limit(1);
+
+    if (defaultWishlist.length === 0) {
+      const [newWishlist] = await db
+        .insert(wishlists)
+        .values({
+          userId,
+          name: "My Wishlist",
+          isDefault: true
+        })
+        .returning();
+      
+      defaultWishlist = [newWishlist];
+    }
+
+    const wishlistId = defaultWishlist[0].id;
+
+    // Verify product exists
+    const product = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
+
+    if (product.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Check if item already exists in wishlist
+    const existingItem = await db
+      .select()
+      .from(wishlistItems)
+      .where(and(eq(wishlistItems.wishlistId, wishlistId), eq(wishlistItems.productId, productId)))
+      .limit(1);
+
+    if (existingItem.length > 0) {
+      return res.status(409).json({ error: "Product already in wishlist" });
+    }
+
+    // Add item to wishlist
+    const [newItem] = await db
+      .insert(wishlistItems)
+      .values({
+        wishlistId,
+        productId,
+        notes
+      })
+      .returning();
+
+    res.status(201).json(newItem);
+  } catch (error) {
+    console.error("Error adding item to default wishlist:", error);
+    res.status(500).json({ error: "Failed to add item to wishlist" });
+  }
+});
+
 // Add item to wishlist
 router.post("/:wishlistId/items", authenticateToken, async (req, res) => {
   try {
@@ -226,6 +297,40 @@ router.post("/default/items", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Error adding item to default wishlist:", error);
     res.status(500).json({ error: "Failed to add item to wishlist" });
+  }
+});
+
+// Remove item from default wishlist by product ID
+router.delete("/default/items/product/:productId", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { productId } = req.params;
+
+    // Get default wishlist
+    const defaultWishlist = await db
+      .select()
+      .from(wishlists)
+      .where(and(eq(wishlists.userId, userId), eq(wishlists.isDefault, true)))
+      .limit(1);
+
+    if (defaultWishlist.length === 0) {
+      return res.status(404).json({ error: "Default wishlist not found" });
+    }
+
+    // Remove item by productId
+    const deletedItems = await db
+      .delete(wishlistItems)
+      .where(and(eq(wishlistItems.wishlistId, defaultWishlist[0].id), eq(wishlistItems.productId, productId)))
+      .returning();
+
+    if (deletedItems.length === 0) {
+      return res.status(404).json({ error: "Item not found in wishlist" });
+    }
+
+    res.json({ message: "Item removed from wishlist", item: deletedItems[0] });
+  } catch (error) {
+    console.error("Error removing item from default wishlist:", error);
+    res.status(500).json({ error: "Failed to remove item from wishlist" });
   }
 });
 
