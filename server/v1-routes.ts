@@ -843,7 +843,10 @@ export function setupV1Routes(app: any, storage: any) {
         if (req.body.items && Array.isArray(req.body.items)) {
           for (const item of req.body.items) {
             // Get product details for order item
-            const [product] = await tx.select().from(products).where(eq(products.id, item.productId));
+            const productResult = await tx.select().from(products).where(eq(products.id, item.productId));
+            const product = productResult[0];
+            
+            console.log('Product lookup result:', { productId: item.productId, found: !!product, product });
             
             if (!product) {
               throw new Error(`Product not found: ${item.productId}`);
@@ -852,19 +855,24 @@ export function setupV1Routes(app: any, storage: any) {
             const unitPrice = parseFloat(item.price);
             const totalPrice = unitPrice * item.quantity;
             
-            await tx.insert(orderItems).values({
+            // Ensure we have all required fields with fallbacks
+            const orderItemData = {
               orderId: newOrder.id,
               productId: item.productId,
-              sku: product.sku || `SKU-${Date.now()}`,
-              name: product.name,
-              description: product.description,
+              sku: product.sku || `SKU-${Date.now()}-${item.productId.slice(-8)}`,
+              name: product.name || 'Product',
+              description: product.description || null,
               quantity: item.quantity,
               unitPrice: unitPrice.toFixed(2),
               totalPrice: totalPrice.toFixed(2),
               price: unitPrice.toFixed(2),
               total: totalPrice.toFixed(2),
               status: "pending"
-            });
+            };
+            
+            console.log('Order item data to insert:', orderItemData);
+            
+            await tx.insert(orderItems).values(orderItemData);
           }
         }
 
