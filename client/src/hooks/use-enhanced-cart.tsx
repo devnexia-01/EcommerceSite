@@ -75,25 +75,21 @@ function useCartLogic(): UseCartReturn {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Generate a single session ID for the entire session
-  const [sessionId] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    
-    // Force use existing session if it has items, otherwise create new one  
-    let storedSessionId = localStorage.getItem('cart-session-id');
-    if (!storedSessionId || !storedSessionId.startsWith('session-')) {
-      // Use one of the existing sessions with items for testing
-      storedSessionId = 'lrrbsqEkQ5V7Mw_KgKkpb6BSzuy6vTWE'; // This has 1 item
-      localStorage.setItem('cart-session-id', storedSessionId);
+  // Use a fixed session ID to ensure only one cart
+  const FIXED_SESSION_ID = 'main-cart-session';
+  
+  // Initialize localStorage with fixed session ID
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !user) {
+      localStorage.setItem('cart-session-id', FIXED_SESSION_ID);
     }
-    return storedSessionId;
-  });
+  }, [user]);
 
-  // Get session ID (consistent across all calls)
+  // Get session ID (always the same for guest users)
   const getSessionId = useCallback(() => {
     if (user) return null; // Don't use session ID if user is logged in
-    return sessionId;
-  }, [user, sessionId]);
+    return FIXED_SESSION_ID;
+  }, [user]);
 
   // Initialize WebSocket connection
   useEffect(() => {
