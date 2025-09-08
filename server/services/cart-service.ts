@@ -294,6 +294,11 @@ export class EnhancedCartService {
     // Recalculate cart totals
     await this.recalculateCartTotals(cartId);
 
+    // Emit WebSocket event for cart item added
+    const websocketService = WebSocketService.getInstance();
+    websocketService.emitCartItemAdded(userId, sessionId, cartItem);
+    websocketService.emitCartUpdate(userId, sessionId);
+
     return {
       id: cartItem.id,
       cartId: cartItem.cartId,
@@ -331,6 +336,12 @@ export class EnhancedCartService {
     // Recalculate cart totals
     await this.recalculateCartTotals(cartItem.cartId);
 
+    // Get cart info for WebSocket events
+    const cart = await this.getCart(undefined, undefined);
+    const websocketService = WebSocketService.getInstance();
+    websocketService.emitCartItemUpdated(cart?.userId, cart?.sessionId, cartItem);
+    websocketService.emitCartUpdate(cart?.userId, cart?.sessionId);
+
     return {
       id: cartItem.id,
       cartId: cartItem.cartId,
@@ -363,6 +374,12 @@ export class EnhancedCartService {
 
     // Recalculate cart totals
     await this.recalculateCartTotals(cartItem.cartId);
+
+    // Get cart info for WebSocket events
+    const cart = await this.getCart(undefined, undefined);
+    const websocketService = WebSocketService.getInstance();
+    websocketService.emitCartItemRemoved(cart?.userId, cart?.sessionId, itemId);
+    websocketService.emitCartUpdate(cart?.userId, cart?.sessionId);
   }
 
   // Clear entire cart
