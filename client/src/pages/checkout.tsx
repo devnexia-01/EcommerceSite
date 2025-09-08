@@ -133,34 +133,43 @@ export default function Checkout() {
   const total = subtotal + shipping + tax;
 
   const onSubmit = async (data: CheckoutFormData) => {
-    const addressData = {
-      firstName: data.firstName,
-      lastName: data.lastName,
-      streetAddress: data.streetAddress,
-      city: data.city,
-      state: data.state,
-      zipCode: data.zipCode,
-      country: data.country
-    };
+    if (currentStep === 1) {
+      // Move from Shipping to Payment
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      // Move from Payment to Review
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
+      // Final step - Place Order
+      const addressData = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        streetAddress: data.streetAddress,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zipCode,
+        country: data.country
+      };
 
-    const orderData = {
-      items: items.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.product.price
-      })),
-      shippingAddress: addressData,
-      billingAddress: data.sameAsBilling ? addressData : addressData, // For now, use same address
-      shippingMethod: data.shippingMethod,
-      currency: "USD",
-      subtotal: subtotal.toFixed(2),
-      shipping: shipping.toFixed(2),
-      tax: tax.toFixed(2),
-      total: total.toFixed(2),
-      status: "pending"
-    };
+      const orderData = {
+        items: items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.product.price
+        })),
+        shippingAddress: addressData,
+        billingAddress: data.sameAsBilling ? addressData : addressData, // For now, use same address
+        shippingMethod: data.shippingMethod,
+        currency: "USD",
+        subtotal: subtotal.toFixed(2),
+        shipping: shipping.toFixed(2),
+        tax: tax.toFixed(2),
+        total: total.toFixed(2),
+        status: "pending"
+      };
 
-    await orderMutation.mutateAsync(orderData);
+      await orderMutation.mutateAsync(orderData);
+    }
   };
 
   const steps = [
@@ -208,13 +217,14 @@ export default function Checkout() {
             {/* Main Form */}
             <div className="lg:col-span-2 space-y-8">
               {/* Shipping Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="h-5 w-5" />
-                    Shipping Information
-                  </CardTitle>
-                </CardHeader>
+              {currentStep >= 1 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck className="h-5 w-5" />
+                      Shipping Information
+                    </CardTitle>
+                  </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -316,8 +326,10 @@ export default function Checkout() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* Shipping Method */}
+              {currentStep >= 1 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Shipping Method</CardTitle>
@@ -380,15 +392,17 @@ export default function Checkout() {
                   />
                 </CardContent>
               </Card>
+              )}
 
               {/* Payment Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Payment Information
-                  </CardTitle>
-                </CardHeader>
+              {currentStep >= 2 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Payment Information
+                    </CardTitle>
+                  </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
@@ -518,12 +532,19 @@ export default function Checkout() {
                     type="submit" 
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     disabled={orderMutation.isPending}
-                    data-testid="place-order"
+                    data-testid={currentStep === 3 ? "place-order" : "continue-checkout"}
                   >
                     {orderMutation.isPending ? (
                       <LoadingSpinner size="sm" className="mr-2" />
                     ) : null}
-                    {orderMutation.isPending ? "Processing..." : `Place Order - $${total.toFixed(2)}`}
+                    {orderMutation.isPending 
+                      ? "Processing..." 
+                      : currentStep === 1 
+                        ? "Continue to Payment" 
+                        : currentStep === 2 
+                          ? "Review Order" 
+                          : `Place Order - $${total.toFixed(2)}`
+                    }
                   </Button>
 
                   <p className="text-xs text-muted-foreground text-center mt-4">
@@ -531,6 +552,7 @@ export default function Checkout() {
                   </p>
                 </CardContent>
               </Card>
+              )}
             </div>
           </form>
         </Form>

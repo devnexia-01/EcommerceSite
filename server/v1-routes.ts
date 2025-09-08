@@ -846,8 +846,6 @@ export function setupV1Routes(app: any, storage: any) {
             const productResult = await tx.select().from(products).where(eq(products.id, item.productId));
             const product = productResult[0];
             
-            console.log('Product lookup result:', { productId: item.productId, found: !!product, product });
-            
             if (!product) {
               throw new Error(`Product not found: ${item.productId}`);
             }
@@ -855,8 +853,7 @@ export function setupV1Routes(app: any, storage: any) {
             const unitPrice = parseFloat(item.price);
             const totalPrice = unitPrice * item.quantity;
             
-            // Ensure we have all required fields with fallbacks
-            const orderItemData = {
+            await tx.insert(orderItems).values({
               orderId: newOrder.id,
               productId: item.productId,
               sku: product.sku || `SKU-${Date.now()}-${item.productId.slice(-8)}`,
@@ -868,11 +865,7 @@ export function setupV1Routes(app: any, storage: any) {
               price: unitPrice.toFixed(2),
               total: totalPrice.toFixed(2),
               status: "pending"
-            };
-            
-            console.log('Order item data to insert:', orderItemData);
-            
-            await tx.insert(orderItems).values(orderItemData);
+            });
           }
         }
 

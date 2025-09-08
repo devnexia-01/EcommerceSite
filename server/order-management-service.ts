@@ -121,18 +121,26 @@ export function setupOrderManagementRoutes(app: Express): void {
       for (const item of orderData.items) {
         // Get product details for order item
         const [product] = await db.select().from(products).where(eq(products.id, item.productId));
-        const totalPrice = (parseFloat(item.price) * item.quantity).toFixed(2);
+        
+        if (!product) {
+          throw new Error(`Product not found: ${item.productId}`);
+        }
+        
+        const unitPrice = parseFloat(item.price);
+        const totalPrice = (unitPrice * item.quantity).toFixed(2);
         
         await db.insert(orderItems).values({
           orderId: newOrder.id,
           productId: item.productId,
-          sku: product?.sku || `SKU-${Date.now()}`,
-          name: product?.name || 'Product',
+          sku: product.sku || `SKU-${Date.now()}-${item.productId.slice(-8)}`,
+          name: product.name || 'Product',
+          description: product.description || null,
           quantity: item.quantity,
-          unitPrice: item.price,
+          unitPrice: unitPrice.toFixed(2),
           totalPrice: totalPrice,
-          price: item.price,
-          total: totalPrice
+          price: unitPrice.toFixed(2),
+          total: totalPrice,
+          status: "pending"
         });
       }
 
