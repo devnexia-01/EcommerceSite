@@ -98,6 +98,14 @@ function useCartLogic(): UseCartReturn {
       
       socket.on('connect', () => {
         console.log('Connected to WebSocket server');
+        // Join cart room for real-time updates
+        const sessionId = getSessionId();
+        if (socket) {
+          socket.emit('join-cart-room', { 
+            userId: user?.id,
+            sessionId: sessionId 
+          });
+        }
       });
 
       socket.on('cart-item-added', (data) => {
@@ -127,7 +135,7 @@ function useCartLogic(): UseCartReturn {
         socket = null;
       }
     };
-  }, []);
+  }, [user, getSessionId]);
 
   // Get authorization headers
   const getAuthHeaders = () => {
@@ -206,6 +214,17 @@ function useCartLogic(): UseCartReturn {
   // Update item quantity
   const updateQuantity = async (itemId: string, quantity: number): Promise<boolean> => {
     try {
+      // Optimistically update the cart UI
+      if (cart && cart.items) {
+        const updatedItems = cart.items.map(item => 
+          item.id === itemId ? { ...item, quantity } : item
+        );
+        setCart({
+          ...cart,
+          items: updatedItems
+        });
+      }
+
       const response = await fetch(`/api/v1/cart/items/${itemId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
@@ -213,9 +232,13 @@ function useCartLogic(): UseCartReturn {
       });
 
       if (response.ok) {
+        // Refresh cart to get accurate data from server
+        await refreshCart();
         return true;
       } else {
         const errorData = await response.json();
+        // Revert optimistic update on error
+        await refreshCart();
         toast({
           title: "Error",
           description: errorData.error || "Failed to update quantity",
@@ -225,6 +248,8 @@ function useCartLogic(): UseCartReturn {
       }
     } catch (error) {
       console.error('Error updating quantity:', error);
+      // Revert optimistic update on error
+      await refreshCart();
       toast({
         title: "Error",
         description: "Failed to update quantity",

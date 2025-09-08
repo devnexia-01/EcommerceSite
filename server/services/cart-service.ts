@@ -253,8 +253,8 @@ export class CartService {
 
     // Emit WebSocket events
     const websocketService = WebSocketService.getInstance();
-    websocketService.emitCartItemUpdated(cart?.userId, cart?.sessionId, cartItem);
-    websocketService.emitCartUpdate(cart?.userId, cart?.sessionId);
+    websocketService.emitCartItemUpdated(cart?.userId || undefined, cart?.sessionId || undefined, cartItem);
+    websocketService.emitCartUpdate(cart?.userId || undefined, cart?.sessionId || undefined);
   }
 
   // Remove item from cart
@@ -285,8 +285,8 @@ export class CartService {
 
     // Emit WebSocket events
     const websocketService = WebSocketService.getInstance();
-    websocketService.emitCartItemRemoved(cart?.userId, cart?.sessionId, itemId);
-    websocketService.emitCartUpdate(cart?.userId, cart?.sessionId);
+    websocketService.emitCartItemRemoved(cart?.userId || undefined, cart?.sessionId || undefined, itemId);
+    websocketService.emitCartUpdate(cart?.userId || undefined, cart?.sessionId || undefined);
   }
 
   // Clear entire cart
