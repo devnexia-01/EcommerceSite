@@ -16,7 +16,7 @@ interface AuthenticatedRequest extends express.Request {
 // Middleware to extract user info from session or token
 const getUserInfo = (req: AuthenticatedRequest) => {
   const userId = req.user?.userId; // From authentication middleware
-  const sessionId = req.headers['x-session-id'] as string || req.sessionID;
+  const sessionId = req.headers['x-session-id'] as string || req.sessionID || 'session-' + Math.random().toString(36).substr(2, 9);
   return { userId, sessionId };
 };
 
@@ -39,9 +39,10 @@ const updateQuantitySchema = z.object({
 router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
-  if (!userId && !sessionId) {
+  // Always allow requests - use sessionId if no userId
+  if (!sessionId) {
     return res.status(400).json({ 
-      error: 'User authentication or session required' 
+      error: 'Session required' 
     });
   }
 
@@ -65,9 +66,10 @@ router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: express.Resp
 router.post('/items', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
-  if (!userId && !sessionId) {
+  // Always allow requests - use sessionId if no userId
+  if (!sessionId) {
     return res.status(400).json({ 
-      error: 'User authentication or session required' 
+      error: 'Session required' 
     });
   }
 
@@ -136,9 +138,10 @@ router.delete('/items/:itemId', asyncHandler(async (req: AuthenticatedRequest, r
 router.delete('/', asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
   const { userId, sessionId } = getUserInfo(req);
   
-  if (!userId && !sessionId) {
+  // Always allow requests - use sessionId if no userId
+  if (!sessionId) {
     return res.status(400).json({ 
-      error: 'User authentication or session required' 
+      error: 'Session required' 
     });
   }
 
