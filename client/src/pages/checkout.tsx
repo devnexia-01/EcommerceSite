@@ -152,7 +152,12 @@ export default function Checkout() {
       shippingAddress: addressData,
       billingAddress: data.sameAsBilling ? addressData : addressData, // For now, use same address
       shippingMethod: data.shippingMethod,
-      currency: "USD"
+      currency: "USD",
+      subtotal: subtotal.toFixed(2),
+      shipping: shipping.toFixed(2),
+      tax: tax.toFixed(2),
+      total: total.toFixed(2),
+      status: "pending"
     };
 
     await orderMutation.mutateAsync(orderData);
