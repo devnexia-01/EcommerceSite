@@ -75,17 +75,22 @@ function useCartLogic(): UseCartReturn {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Get or create session ID
+  // Generate a single session ID for the entire session
+  const [sessionId] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    let storedSessionId = localStorage.getItem('cart-session-id');
+    if (!storedSessionId) {
+      storedSessionId = 'session-' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('cart-session-id', storedSessionId);
+    }
+    return storedSessionId;
+  });
+
+  // Get session ID (consistent across all calls)
   const getSessionId = useCallback(() => {
     if (user) return null; // Don't use session ID if user is logged in
-    
-    let sessionId = localStorage.getItem('cart-session-id');
-    if (!sessionId) {
-      sessionId = 'session-' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('cart-session-id', sessionId);
-    }
     return sessionId;
-  }, [user]);
+  }, [user, sessionId]);
 
   // Initialize WebSocket connection
   useEffect(() => {
