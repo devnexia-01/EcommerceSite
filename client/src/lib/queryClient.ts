@@ -17,6 +17,7 @@ export async function apiRequest(
   
   // Get session ID from localStorage for guest cart functionality
   const sessionId = typeof window !== 'undefined' ? localStorage.getItem('cart-session-id') : null;
+  console.log('queryClient.ts apiRequest session ID:', sessionId); // Debug log
   
   const headers: Record<string, string> = {
     ...(data ? { "Content-Type": "application/json" } : {}),
@@ -66,6 +67,7 @@ export const getQueryFn: <T>(options: {
     
     // Get session ID from localStorage for guest cart functionality
     const sessionId = typeof window !== 'undefined' ? localStorage.getItem('cart-session-id') : null;
+    console.log('queryClient.ts getQueryFn session ID:', sessionId); // Debug log
     
     const headers: Record<string, string> = {
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),

@@ -80,16 +80,16 @@ function useCartLogic(): UseCartReturn {
   
   // Initialize localStorage with fixed session ID
   useEffect(() => {
-    if (typeof window !== 'undefined' && !user) {
+    if (typeof window !== 'undefined') {
       localStorage.setItem('cart-session-id', FIXED_SESSION_ID);
     }
-  }, [user]);
+  }, []);
 
-  // Get session ID (always the same for guest users)
+  // Get session ID (use fixed session for all users to avoid conflicts)
   const getSessionId = useCallback(() => {
-    if (user) return null; // Don't use session ID if user is logged in
+    // Always use the fixed session ID to avoid cart fragmentation
     return FIXED_SESSION_ID;
-  }, [user]);
+  }, []);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -135,12 +135,10 @@ function useCartLogic(): UseCartReturn {
       'Content-Type': 'application/json',
     };
 
-    // Add session ID if no user
+    // Always add session ID for consistency
     const sessionId = getSessionId();
-    if (sessionId) {
-      headers['x-session-id'] = sessionId;
-      console.log('Frontend sending session ID:', sessionId); // Debug log
-    }
+    headers['x-session-id'] = sessionId;
+    console.log('Frontend sending session ID:', sessionId, 'Headers:', headers); // Debug log
 
     return headers;
   };

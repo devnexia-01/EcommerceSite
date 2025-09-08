@@ -17,7 +17,7 @@ interface AuthenticatedRequest extends express.Request {
 const getUserInfo = (req: AuthenticatedRequest) => {
   const userId = req.user?.userId; // From authentication middleware
   const sessionId = req.headers['x-session-id'] as string || req.sessionID || 'session-' + Math.random().toString(36).substr(2, 9);
-  console.log('Server received session ID:', sessionId); // Debug log
+  console.log('Server received - userId:', userId, 'sessionId:', sessionId); // Debug log
   return { userId, sessionId };
 };
 
