@@ -121,7 +121,12 @@ function useCartLogic(): UseCartReturn {
 
     // Add session ID if no user
     if (!user) {
-      headers['x-session-id'] = 'session-' + Math.random().toString(36).substr(2, 9);
+      let sessionId = localStorage.getItem('cart-session-id');
+      if (!sessionId) {
+        sessionId = 'session-' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('cart-session-id', sessionId);
+      }
+      headers['x-session-id'] = sessionId;
     }
 
     return headers;
