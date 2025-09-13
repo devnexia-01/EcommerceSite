@@ -474,6 +474,7 @@ export default function Checkout() {
                   />
                 </CardContent>
               </Card>
+              )}
             </div>
 
             {/* Order Summary */}
@@ -552,7 +553,6 @@ export default function Checkout() {
                   </p>
                 </CardContent>
               </Card>
-              )}
             </div>
           </form>
         </Form>
