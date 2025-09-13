@@ -8,6 +8,9 @@ import {
   loginAttemptMonitor,
   SystemMetricsCollector 
 } from "./activity-tracker";
+import { seed } from "./seed";
+import { db } from "./db";
+import { products } from "@shared/schema";
 
 const app = express();
 app.use(express.json());
@@ -59,7 +62,29 @@ app.use((req, res, next) => {
   next();
 });
 
+// Function to check if database needs seeding
+async function autoSeed() {
+  try {
+    // Check if database has any products (indicating it's already seeded)
+    const existingProducts = await db.select().from(products).limit(1);
+    
+    if (existingProducts.length === 0) {
+      log("🌱 Database is empty, running automatic seeding...");
+      await seed();
+      log("✅ Automatic database seeding completed!");
+    } else {
+      log("📦 Database already contains data, skipping seeding");
+    }
+  } catch (error) {
+    log(`❌ Error during auto-seeding check: ${error}`);
+    // Still continue server startup even if seeding fails
+  }
+}
+
 (async () => {
+  // Run automatic seeding before starting the server
+  await autoSeed();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
