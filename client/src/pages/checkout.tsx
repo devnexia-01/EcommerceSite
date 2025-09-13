@@ -18,6 +18,7 @@ import { useCart } from "@/hooks/use-enhanced-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 
 // Step-based validation schemas
 const shippingSchema = z.object({
@@ -41,9 +42,16 @@ type CheckoutFormData = z.infer<typeof checkoutSchema>;
 export default function Checkout() {
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
+  const [useNewAddress, setUseNewAddress] = useState(false);
   const { items, totalPrice, clearCart } = useCart();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+
+  // Fetch user's saved addresses
+  const { data: addresses = [] } = useQuery<any[]>({
+    queryKey: ['/api/addresses'],
+    enabled: isAuthenticated
+  });
 
   // Use shipping schema for all steps (Razorpay handles payment)
   const getCurrentSchema = () => {
@@ -66,6 +74,18 @@ export default function Checkout() {
       sameAsBilling: true
     }
   });
+
+  // Function to populate form with selected address
+  const populateAddressForm = (address: any) => {
+    form.setValue("firstName", address.firstName);
+    form.setValue("lastName", address.lastName);
+    form.setValue("streetAddress", address.streetAddress);
+    form.setValue("city", address.city);
+    form.setValue("state", address.state);
+    form.setValue("zipCode", address.zipCode);
+    form.setValue("country", address.country || "US");
+    setUseNewAddress(false);
+  };
 
   const orderMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -331,6 +351,51 @@ export default function Checkout() {
                     </CardTitle>
                   </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Saved Address Selection */}
+                  {addresses.length > 0 && (
+                    <div className="space-y-3 mb-6">
+                      <h4 className="font-medium">Select from saved addresses</h4>
+                      <div className="space-y-2">
+                        {addresses.map((address: any) => (
+                          <Card 
+                            key={address.id} 
+                            className={`cursor-pointer transition-colors ${
+                              !useNewAddress ? "border-primary bg-primary/5" : "hover:border-muted-foreground"
+                            }`}
+                            onClick={() => populateAddressForm(address)}
+                            data-testid={`saved-address-${address.id}`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="font-medium">
+                                    {address.firstName} {address.lastName}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {address.streetAddress}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {address.city}, {address.state} {address.zipCode}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setUseNewAddress(true)}
+                        data-testid="use-new-address"
+                      >
+                        Use Different Address
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Address Form (show if no saved addresses or user wants new address) */}
+                  {(addresses.length === 0 || useNewAddress) && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -429,6 +494,7 @@ export default function Checkout() {
                       )}
                     />
                   </div>
+                  )}
                 </CardContent>
               </Card>
               )}
