@@ -19,7 +19,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-const checkoutSchema = z.object({
+// Step-based validation schemas
+const shippingSchema = z.object({
   email: z.string().email("Invalid email address"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -30,11 +31,16 @@ const checkoutSchema = z.object({
   country: z.string().default("US"),
   shippingMethod: z.string().min(1, "Please select a shipping method"),
   sameAsBilling: z.boolean().default(true),
+});
+
+const paymentSchema = shippingSchema.extend({
   cardNumber: z.string().min(16, "Card number is required"),
   expiryDate: z.string().min(5, "Expiry date is required"),
   cvv: z.string().min(3, "CVV is required"),
   cardholderName: z.string().min(1, "Cardholder name is required")
 });
+
+const checkoutSchema = paymentSchema;
 
 type CheckoutFormData = z.infer<typeof checkoutSchema>;
 
@@ -45,8 +51,16 @@ export default function Checkout() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
+  // Get current schema based on step
+  const getCurrentSchema = () => {
+    if (currentStep === 1) return shippingSchema;
+    if (currentStep === 2) return paymentSchema;
+    return checkoutSchema;
+  };
+
   const form = useForm<CheckoutFormData>({
-    resolver: zodResolver(checkoutSchema),
+    resolver: zodResolver(getCurrentSchema()),
+    mode: "onChange",
     defaultValues: {
       email: user?.email || "",
       firstName: user?.firstName || "",
@@ -133,42 +147,63 @@ export default function Checkout() {
   const total = subtotal + shipping + tax;
 
   const onSubmit = async (data: CheckoutFormData) => {
-    if (currentStep === 1) {
-      // Move from Shipping to Payment
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      // Move from Payment to Review
-      setCurrentStep(3);
-    } else if (currentStep === 3) {
-      // Final step - Place Order
-      const addressData = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        streetAddress: data.streetAddress,
-        city: data.city,
-        state: data.state,
-        zipCode: data.zipCode,
-        country: data.country
-      };
+    try {
+      if (currentStep === 1) {
+        // Validate shipping fields only
+        const validData = shippingSchema.parse(data);
+        // Move from Shipping to Payment
+        setCurrentStep(2);
+        // Update form with new validation schema
+        form.clearErrors();
+      } else if (currentStep === 2) {
+        // Validate payment fields
+        const validData = paymentSchema.parse(data);
+        // Move from Payment to Review
+        setCurrentStep(3);
+        form.clearErrors();
+      } else if (currentStep === 3) {
+        // Final step - Place Order
+        const validData = checkoutSchema.parse(data);
+        
+        const addressData = {
+          firstName: validData.firstName,
+          lastName: validData.lastName,
+          streetAddress: validData.streetAddress,
+          city: validData.city,
+          state: validData.state,
+          zipCode: validData.zipCode,
+          country: validData.country
+        };
 
-      const orderData = {
-        items: items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          price: item.product.price
-        })),
-        shippingAddress: addressData,
-        billingAddress: data.sameAsBilling ? addressData : addressData, // For now, use same address
-        shippingMethod: data.shippingMethod,
-        currency: "USD",
-        subtotal: subtotal.toFixed(2),
-        shipping: shipping.toFixed(2),
-        tax: tax.toFixed(2),
-        total: total.toFixed(2),
-        status: "pending"
-      };
+        const orderData = {
+          items: items.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.product.price
+          })),
+          shippingAddress: addressData,
+          billingAddress: validData.sameAsBilling ? addressData : addressData,
+          shippingMethod: validData.shippingMethod,
+          currency: "USD",
+          subtotal: subtotal.toFixed(2),
+          shipping: shipping.toFixed(2),
+          tax: tax.toFixed(2),
+          total: total.toFixed(2),
+          status: "pending"
+        };
 
-      await orderMutation.mutateAsync(orderData);
+        await orderMutation.mutateAsync(orderData);
+      }
+    } catch (error) {
+      // Handle validation errors
+      if (error instanceof z.ZodError) {
+        error.errors.forEach((err) => {
+          form.setError(err.path[0] as any, {
+            type: "manual",
+            message: err.message,
+          });
+        });
+      }
     }
   };
 
