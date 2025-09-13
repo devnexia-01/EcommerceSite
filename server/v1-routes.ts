@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import cartV1Routes from "./routes/cart-v1";
 import { storage } from "./storage";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 import { productService } from "./product-service";
 import { brandService } from "./brand-service";
 import {
@@ -816,15 +818,15 @@ export function setupV1Routes(app: any, storage: any) {
         ...req.body,
         shippingAddress: {
           ...req.body.shippingAddress,
-          company: req.body.shippingAddress?.company || undefined,
-          streetAddress2: req.body.shippingAddress?.streetAddress2 || undefined,
-          phone: req.body.shippingAddress?.phone || undefined
+          company: typeof req.body.shippingAddress?.company === 'string' ? req.body.shippingAddress.company : undefined,
+          streetAddress2: typeof req.body.shippingAddress?.streetAddress2 === 'string' ? req.body.shippingAddress.streetAddress2 : undefined,
+          phone: typeof req.body.shippingAddress?.phone === 'string' ? req.body.shippingAddress.phone : undefined
         },
         billingAddress: {
           ...req.body.billingAddress,
-          company: req.body.billingAddress?.company || undefined,
-          streetAddress2: req.body.billingAddress?.streetAddress2 || undefined,
-          phone: req.body.billingAddress?.phone || undefined
+          company: typeof req.body.billingAddress?.company === 'string' ? req.body.billingAddress.company : undefined,
+          streetAddress2: typeof req.body.billingAddress?.streetAddress2 === 'string' ? req.body.billingAddress.streetAddress2 : undefined,
+          phone: typeof req.body.billingAddress?.phone === 'string' ? req.body.billingAddress.phone : undefined
         }
       };
 
@@ -1077,6 +1079,149 @@ export function setupV1Routes(app: any, storage: any) {
       res.status(500).json({ 
         success: false,
         error: "Failed to cancel order" 
+      });
+    }
+  });
+
+  // ===== Razorpay Payment Integration =====
+  
+  // Initialize Razorpay (will be properly configured with environment variables)
+  let razorpay: Razorpay | null = null;
+  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+
+  // POST /api/v1/create-razorpay-order - Server-calculated amount from cart
+  app.post("/api/v1/create-razorpay-order", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!razorpay) {
+        return res.status(500).json({
+          success: false,
+          error: "Razorpay not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables."
+        });
+      }
+
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false, 
+          error: "Authentication required" 
+        });
+      }
+
+      // Get cart items from server to calculate amount securely
+      const userCart = await storage.getCartByUser(userId);
+      if (!userCart || !userCart.items.length) {
+        return res.status(400).json({
+          success: false,
+          error: "Cart is empty"
+        });
+      }
+
+      // Calculate server-side amount
+      let subtotal = 0;
+      for (const item of userCart.items) {
+        const product = await storage.getProductById(item.productId);
+        if (product) {
+          subtotal += parseFloat(product.price) * item.quantity;
+        }
+      }
+
+      // Apply shipping based on request
+      const shippingMethod = req.body.shippingMethod || "standard";
+      const shipping = shippingMethod === "express" ? 15.00 : 
+                     shippingMethod === "overnight" ? 30.00 : 
+                     subtotal > 40 ? 0 : 8.00;
+      
+      const tax = subtotal * 0.18; // 18% GST for India
+      const total = subtotal + shipping + tax;
+      const amountInPaise = Math.round(total * 100); // Convert to paise
+      
+      const options = {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `order_${Date.now()}_${userId}`,
+        payment_capture: 1
+      };
+
+      const order = await razorpay.orders.create(options);
+      
+      res.json({
+        success: true,
+        data: {
+          id: order.id,
+          currency: order.currency,
+          amount: order.amount
+        }
+      });
+    } catch (error: any) {
+      console.error("Error creating Razorpay order:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create payment order"
+      });
+    }
+  });
+
+  // POST /api/v1/verify-razorpay-payment - Verify payment and create order
+  app.post("/api/v1/verify-razorpay-payment", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!process.env.RAZORPAY_KEY_SECRET) {
+        return res.status(500).json({
+          success: false,
+          error: "Razorpay secret not configured"
+        });
+      }
+
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false, 
+          error: "Authentication required" 
+        });
+      }
+
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
+      
+      // Verify payment signature
+      const sign = razorpay_order_id + "|" + razorpay_payment_id;
+      const expectedSign = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(sign.toString())
+        .digest("hex");
+      
+      if (razorpay_signature !== expectedSign) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid payment signature" 
+        });
+      }
+
+      // Payment verified - now create the order
+      const cleanedOrderData = {
+        ...orderData,
+        userId,
+        orderNumber: generateOrderNumber(),
+        paymentId: razorpay_payment_id,
+        razorpayOrderId: razorpay_order_id,
+        status: "paid"
+      };
+
+      const order = await storage.createOrder(cleanedOrderData);
+      
+      res.json({ 
+        success: true, 
+        message: "Payment verified and order created",
+        orderId: order.id
+      });
+    } catch (error: any) {
+      console.error("Error verifying payment:", error);
+      res.status(500).json({
+        success: false,
+        error: "Payment verification failed"
       });
     }
   });
