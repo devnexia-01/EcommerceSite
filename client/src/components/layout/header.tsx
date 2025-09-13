@@ -22,7 +22,7 @@ export default function Header() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
-  const { totalItems } = useCart();
+  const { itemCount } = useCart();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,12 +110,12 @@ export default function Header() {
                 data-testid="cart-button"
               >
                 <ShoppingCart className="h-5 w-5 lg:h-6 lg:w-6" />
-                {totalItems > 0 && (
+                {itemCount > 0 && (
                   <Badge 
                     className="absolute -top-1 -right-1 h-5 w-5 lg:h-6 lg:w-6 flex items-center justify-center p-0 text-xs bg-primary text-primary-foreground"
                     data-testid="cart-badge"
                   >
-                    {totalItems}
+                    {itemCount}
                   </Badge>
                 )}
               </Button>
