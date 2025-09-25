@@ -118,7 +118,7 @@ export default function Footer() {
                 placeholder="Your email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/60 h-12 rounded-lg"
+                className="border-primary-foreground/20 bg-white/90 text-black placeholder:text-gray-600 h-12 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-foreground/50"
                 data-testid="newsletter-email"
                 disabled={isSubmitting}
               />

@@ -7,6 +7,7 @@ import { AuthProvider } from "./hooks/use-auth";
 import { EnhancedCartProvider } from "./hooks/use-enhanced-cart";
 import Header from "./components/layout/header";
 import Footer from "./components/layout/footer";
+import ScrollToTop from "./components/scroll-to-top";
 import Home from "./pages/home";
 import Products from "./pages/products";
 import Categories from "./pages/categories";
@@ -64,6 +65,7 @@ function App() {
         <AuthProvider>
           <EnhancedCartProvider>
             <div className="min-h-screen flex flex-col">
+              <ScrollToTop />
               <Header />
               <main className="flex-1">
                 <Router />
