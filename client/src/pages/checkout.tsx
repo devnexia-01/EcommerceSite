@@ -396,104 +396,106 @@ export default function Checkout() {
                   
                   {/* Address Form (show if no saved addresses or user wants new address) */}
                   {(addresses.length === 0 || useNewAddress) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="first-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="last-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="first-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="last-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" {...field} data-testid="email" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} data-testid="email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="streetAddress"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Street Address</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="street-address" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <FormField
+                      control={form.control}
+                      name="streetAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Street Address</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="street-address" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>City</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="city" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="state"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>State</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="state" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="zipCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>ZIP Code</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="zip-code" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="city" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="state" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>ZIP Code</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="zip-code" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </>
                   )}
                 </CardContent>
               </Card>
