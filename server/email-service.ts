@@ -18,6 +18,7 @@ export interface EmailTemplate {
 export interface NotificationContext {
   userName: string;
   userEmail: string;
+  firstName?: string;
   orderId?: string;
   orderItems?: Array<{ name: string; quantity: number; price: number }>;
   orderTotal?: number;
@@ -28,6 +29,8 @@ export interface NotificationContext {
   promotionTitle?: string;
   promotionDiscount?: string;
   promotionCode?: string;
+  otp?: string;
+  verificationLink?: string;
 }
 
 // Email Templates
@@ -149,6 +152,46 @@ export const emailTemplates = {
       </div>
     `,
     text: `Product recommendation: ${context.productName} for $${context.productPrice?.toFixed(2)}. Personalized just for you!`
+  }),
+
+  otpVerification: (context: NotificationContext & { otp?: string }): EmailTemplate => ({
+    subject: 'Your Verification Code',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333;">Verification Code</h1>
+        <p>Hi ${context.userName},</p>
+        <p>Please use this verification code to complete your action:</p>
+        
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <h2 style="font-size: 32px; letter-spacing: 8px; color: #007bff; margin: 0; font-weight: bold;">${context.otp}</h2>
+        </div>
+        
+        <p>This code will expire in 10 minutes. If you didn't request this code, please ignore this email.</p>
+        <p>For security reasons, never share this code with anyone.</p>
+      </div>
+    `,
+    text: `Your verification code is: ${context.otp}. This code expires in 10 minutes. Never share this code with anyone.`
+  }),
+
+  emailSubscriptionWelcome: (context: NotificationContext & { verificationLink?: string }): EmailTemplate => ({
+    subject: 'Confirm Your Email Subscription',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333;">Confirm Your Subscription</h1>
+        <p>Hi ${context.firstName || 'there'},</p>
+        <p>Thank you for subscribing to our newsletter! Please confirm your email address to start receiving updates.</p>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <a href="${context.verificationLink}" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Confirm Subscription</a>
+        </div>
+        
+        <p>If the button doesn't work, copy and paste this link in your browser:</p>
+        <p style="background: #f1f1f1; padding: 10px; border-radius: 4px; word-break: break-all;">${context.verificationLink}</p>
+        
+        <p>If you didn't subscribe to our newsletter, you can safely ignore this email.</p>
+      </div>
+    `,
+    text: `Confirm your subscription by visiting: ${context.verificationLink}. If you didn't subscribe, you can safely ignore this email.`
   })
 };
 
@@ -206,6 +249,10 @@ export class EmailNotificationService {
         return preferences.promotionalEmails ?? false;
       case 'productRecommendation':
         return preferences.productRecommendations ?? true;
+      case 'otpVerification':
+        return true; // Always send OTP emails for security
+      case 'emailSubscriptionWelcome':
+        return true; // Always send subscription confirmation
       default:
         return true;
     }
@@ -430,6 +477,45 @@ export class EmailNotificationService {
       await sgMail.send(msg);
     } catch (error) {
       console.error('Error sending newsletter welcome email:', error);
+      throw error;
+    }
+  }
+
+  // Send OTP verification email
+  async sendOTPEmail(userEmail: string, userName: string, otp: string): Promise<void> {
+    try {
+      const context: NotificationContext & { otp: string } = {
+        userName,
+        userEmail,
+        otp
+      };
+
+      await this.sendNotification('otpVerification', userEmail, context);
+    } catch (error) {
+      console.error('Error sending OTP email:', error);
+      throw error;
+    }
+  }
+
+  // Send email subscription confirmation
+  async sendSubscriptionConfirmation(
+    email: string,
+    firstName: string,
+    verificationToken: string
+  ): Promise<void> {
+    try {
+      const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-subscription?token=${verificationToken}`;
+      
+      const context: NotificationContext & { verificationLink: string } = {
+        userName: firstName,
+        userEmail: email,
+        firstName,
+        verificationLink
+      };
+
+      await this.sendNotification('emailSubscriptionWelcome', email, context);
+    } catch (error) {
+      console.error('Error sending subscription confirmation email:', error);
       throw error;
     }
   }
