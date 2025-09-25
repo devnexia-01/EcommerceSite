@@ -577,7 +577,12 @@ export default function Admin() {
                               <FormItem>
                                 <FormLabel>Stock</FormLabel>
                                 <FormControl>
-                                  <Input type="number" {...field} data-testid="product-stock" />
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                    data-testid="product-stock" 
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
