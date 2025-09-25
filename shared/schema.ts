@@ -35,6 +35,11 @@ export const users = pgTable("users", {
   emailVerificationToken: text("email_verification_token"),
   phoneVerificationToken: text("phone_verification_token"),
   
+  // OTP verification for signup and forgot password
+  verificationOTP: text("verification_otp"),
+  otpExpiresAt: timestamp("otp_expires_at"),
+  failedOtpAttempts: integer("failed_otp_attempts").default(0),
+  
   // Metadata
   createdAt: timestamp("created_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`),
@@ -2118,6 +2123,53 @@ export const walletPaymentsRelations = relations(walletPayments, ({ one }) => ({
   }),
 }));
 
+// Email subscriptions table
+export const emailSubscriptions = pgTable("email_subscriptions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  status: text("status").default("pending"), // pending, active, unsubscribed
+  subscriptionDate: timestamp("subscription_date").default(sql`now()`),
+  unsubscribeDate: timestamp("unsubscribe_date"),
+  verificationToken: text("verification_token"),
+  verified: boolean("verified").default(false),
+  verifiedAt: timestamp("verified_at"),
+  source: text("source").default("website"), // website, checkout, popup
+  preferences: jsonb("preferences").$type<{
+    promotions?: boolean;
+    newProducts?: boolean;
+    weeklyDeals?: boolean;
+  }>().default({
+    promotions: true,
+    newProducts: true,
+    weeklyDeals: true
+  }),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`)
+});
+
+// Purchase intents table for buy now functionality
+export const purchaseIntents = pgTable("purchase_intents", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  sessionId: text("session_id"), // For guest purchases
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  variantId: uuid("variant_id"), // For product variants
+  quantity: integer("quantity").notNull().default(1),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  customization: jsonb("customization").$type<{
+    color?: string;
+    size?: string;
+    engraving?: string;
+    giftMessage?: string;
+    [key: string]: any;
+  }>(),
+  status: text("status").default("pending"), // pending, completed, expired, cancelled
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`)
+});
+
 // ============ PAYMENT SYSTEM SCHEMAS ============
 
 export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({
@@ -2179,3 +2231,28 @@ export type InsertWalletPayment = z.infer<typeof insertWalletPaymentSchema>;
 
 export type PaymentGateway = typeof paymentGateways.$inferSelect;
 export type InsertPaymentGateway = z.infer<typeof insertPaymentGatewaySchema>;
+
+// ============ NEW FEATURE SCHEMAS ============
+
+// Email subscriptions schemas
+export const insertEmailSubscriptionSchema = createInsertSchema(emailSubscriptions).omit({
+  id: true,
+  subscriptionDate: true,
+  verificationToken: true,
+  verifiedAt: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertPurchaseIntentSchema = createInsertSchema(purchaseIntents).omit({
+  id: true,
+  createdAt: true
+});
+
+// ============ NEW FEATURE TYPES ============
+
+export type EmailSubscription = typeof emailSubscriptions.$inferSelect;
+export type InsertEmailSubscription = z.infer<typeof insertEmailSubscriptionSchema>;
+
+export type PurchaseIntent = typeof purchaseIntents.$inferSelect;
+export type InsertPurchaseIntent = z.infer<typeof insertPurchaseIntentSchema>;

@@ -3,6 +3,7 @@ import {
   userPreferences, userSettings, refreshTokens, passwordResetTokens, loginSessions,
   adminRoles, adminUsers, adminPermissions, systemConfig, auditLogs, content,
   media, userActivity, securityLogs, ipBlacklist, backupLogs,
+  emailSubscriptions, purchaseIntents, productVariants, productMedia,
   type User, type InsertUser, type Category, type InsertCategory, 
   type Product, type InsertProduct, type Address, type InsertAddress,
   type CartItem, type InsertCartItem, type Order, type InsertOrder,
@@ -21,7 +22,9 @@ import {
   type UserActivity, type InsertUserActivity,
   type SecurityLog, type InsertSecurityLog,
   type IpBlacklist, type InsertIpBlacklist,
-  type BackupLog, type InsertBackupLog
+  type BackupLog, type InsertBackupLog,
+  type EmailSubscription, type InsertEmailSubscription,
+  type PurchaseIntent, type InsertPurchaseIntent
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, ilike, and, sql, count, or, gte, lte } from "drizzle-orm";
@@ -66,6 +69,26 @@ export interface IStorage {
   // Email Verification
   setEmailVerificationToken(userId: string, token: string): Promise<void>;
   verifyEmail(token: string): Promise<User | undefined>;
+  
+  // OTP Verification
+  setUserOTP(userId: string, otp: string, expiresAt: Date): Promise<void>;
+  verifyUserOTP(userId: string, otp: string): Promise<boolean>;
+  clearUserOTP(userId: string): Promise<void>;
+  incrementFailedOtpAttempts(userId: string): Promise<void>;
+  resetFailedOtpAttempts(userId: string): Promise<void>;
+  
+  // Email Subscriptions
+  createEmailSubscription(email: string, firstName?: string, lastName?: string, source?: string): Promise<any>;
+  getEmailSubscription(email: string): Promise<any>;
+  verifyEmailSubscription(token: string): Promise<any>;
+  unsubscribeEmail(token: string): Promise<void>;
+  updateSubscriptionPreferences(email: string, preferences: any): Promise<any>;
+  
+  // Purchase Intents
+  createPurchaseIntent(intent: any): Promise<any>;
+  getPurchaseIntent(id: string): Promise<any>;
+  updatePurchaseIntentStatus(id: string, status: string): Promise<any>;
+  cleanupExpiredPurchaseIntents(): Promise<void>;
   
   // Login Sessions
   createLoginSession(session: InsertLoginSession): Promise<LoginSession>;
@@ -1439,6 +1462,167 @@ export class DatabaseStorage implements IStorage {
       sortBy: params.sortBy as any,
       sortOrder: params.sortOrder as any
     });
+  }
+
+  // ============ OTP VERIFICATION METHODS ============
+  async setUserOTP(userId: string, otp: string, expiresAt: Date): Promise<void> {
+    const hashedOTP = await bcrypt.hash(otp, 12);
+    await db.update(users)
+      .set({
+        verificationOTP: hashedOTP,
+        otpExpiresAt: expiresAt,
+        failedOtpAttempts: 0,
+        updatedAt: sql`now()`
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async verifyUserOTP(userId: string, otp: string): Promise<boolean> {
+    const [user] = await db.select({
+      verificationOTP: users.verificationOTP,
+      otpExpiresAt: users.otpExpiresAt,
+      failedOtpAttempts: users.failedOtpAttempts
+    }).from(users).where(eq(users.id, userId));
+
+    if (!user || !user.verificationOTP || !user.otpExpiresAt) {
+      return false;
+    }
+
+    // Check if OTP is expired
+    if (user.otpExpiresAt < new Date()) {
+      await this.clearUserOTP(userId);
+      return false;
+    }
+
+    // Check if too many failed attempts
+    if ((user.failedOtpAttempts || 0) >= 5) {
+      return false;
+    }
+
+    // Verify OTP
+    const isValid = await bcrypt.compare(otp, user.verificationOTP);
+    
+    if (isValid) {
+      await this.clearUserOTP(userId);
+      await this.resetFailedOtpAttempts(userId);
+      return true;
+    } else {
+      await this.incrementFailedOtpAttempts(userId);
+      return false;
+    }
+  }
+
+  async clearUserOTP(userId: string): Promise<void> {
+    await db.update(users)
+      .set({
+        verificationOTP: null,
+        otpExpiresAt: null,
+        updatedAt: sql`now()`
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async incrementFailedOtpAttempts(userId: string): Promise<void> {
+    await db.update(users)
+      .set({
+        failedOtpAttempts: sql`${users.failedOtpAttempts} + 1`,
+        updatedAt: sql`now()`
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async resetFailedOtpAttempts(userId: string): Promise<void> {
+    await db.update(users)
+      .set({
+        failedOtpAttempts: 0,
+        updatedAt: sql`now()`
+      })
+      .where(eq(users.id, userId));
+  }
+
+  // ============ EMAIL SUBSCRIPTION METHODS ============
+  async createEmailSubscription(email: string, firstName?: string, lastName?: string, source?: string): Promise<EmailSubscription> {
+    const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    const [subscription] = await db.insert(emailSubscriptions).values({
+      email,
+      firstName,
+      lastName,
+      verificationToken,
+      source: source || 'website',
+      status: 'pending'
+    }).returning();
+
+    return subscription;
+  }
+
+  async getEmailSubscription(email: string): Promise<EmailSubscription | undefined> {
+    const [subscription] = await db.select().from(emailSubscriptions).where(eq(emailSubscriptions.email, email));
+    return subscription;
+  }
+
+  async verifyEmailSubscription(token: string): Promise<EmailSubscription | undefined> {
+    const [subscription] = await db.update(emailSubscriptions)
+      .set({
+        verified: true,
+        verifiedAt: sql`now()`,
+        status: 'active',
+        updatedAt: sql`now()`
+      })
+      .where(eq(emailSubscriptions.verificationToken, token))
+      .returning();
+
+    return subscription;
+  }
+
+  async unsubscribeEmail(token: string): Promise<void> {
+    await db.update(emailSubscriptions)
+      .set({
+        status: 'unsubscribed',
+        unsubscribeDate: sql`now()`,
+        updatedAt: sql`now()`
+      })
+      .where(eq(emailSubscriptions.verificationToken, token));
+  }
+
+  async updateSubscriptionPreferences(email: string, preferences: any): Promise<EmailSubscription | undefined> {
+    const [subscription] = await db.update(emailSubscriptions)
+      .set({
+        preferences,
+        updatedAt: sql`now()`
+      })
+      .where(eq(emailSubscriptions.email, email))
+      .returning();
+
+    return subscription;
+  }
+
+  // ============ PURCHASE INTENT METHODS ============
+  async createPurchaseIntent(intent: InsertPurchaseIntent): Promise<PurchaseIntent> {
+    const [purchaseIntent] = await db.insert(purchaseIntents).values(intent).returning();
+    return purchaseIntent;
+  }
+
+  async getPurchaseIntent(id: string): Promise<PurchaseIntent | undefined> {
+    const [intent] = await db.select().from(purchaseIntents).where(eq(purchaseIntents.id, id));
+    return intent;
+  }
+
+  async updatePurchaseIntentStatus(id: string, status: string): Promise<PurchaseIntent | undefined> {
+    const [intent] = await db.update(purchaseIntents)
+      .set({ status })
+      .where(eq(purchaseIntents.id, id))
+      .returning();
+
+    return intent;
+  }
+
+  async cleanupExpiredPurchaseIntents(): Promise<void> {
+    await db.delete(purchaseIntents)
+      .where(and(
+        eq(purchaseIntents.status, 'pending'),
+        lte(purchaseIntents.expiresAt, new Date())
+      ));
   }
 }
 
