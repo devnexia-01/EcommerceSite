@@ -1,5 +1,5 @@
-import { Link } from "wouter";
-import { Heart, ShoppingCart, Star } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Heart, ShoppingCart, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { useCart } from "@/hooks/use-enhanced-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useWishlist } from "@/hooks/use-wishlist";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Product {
   id: string;
@@ -29,10 +30,18 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const { toggleWishlist, isInWishlist } = useWishlist();
+  const [, navigate] = useLocation();
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Redirect to login if not authenticated
+    if (!isAuthenticated) {
+      const fullPath = window.location.pathname + window.location.search + window.location.hash;
+      navigate(`/login?redirect=${encodeURIComponent(fullPath)}`);
+      return;
+    }
 
     if (product.stock === 0) {
       toast({
@@ -59,6 +68,43 @@ export default function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     await toggleWishlist(product.id);
+  };
+
+  const handleBuyNow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Redirect to login if not authenticated
+    if (!isAuthenticated) {
+      const fullPath = window.location.pathname + window.location.search + window.location.hash;
+      navigate(`/login?redirect=${encodeURIComponent(fullPath)}`);
+      return;
+    }
+
+    if (product.stock === 0) {
+      toast({
+        title: "Out of stock",
+        description: "This product is currently out of stock",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await apiRequest("POST", "/api/buy-now/create-intent", {
+        productId: product.id,
+        quantity: 1
+      });
+
+      // Redirect to buy now checkout
+      navigate(response.redirectUrl);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create purchase intent. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const discountPercentage = product.comparePrice 
@@ -146,16 +192,29 @@ export default function ProductCard({ product }: ProductCardProps) {
                   </span>
                 )}
               </div>
-              <Button
-                size="sm"
-                onClick={handleAddToCart}
-                disabled={product.stock === 0}
-                className="furniture-btn-primary w-full h-9 sm:h-10 lg:h-11 text-xs sm:text-sm font-medium"
-                data-testid={`add-to-cart-${product.id}`}
-              >
-                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                <span>Add to Cart</span>
-              </Button>
+              <div className="flex flex-col space-y-2">
+                <Button
+                  size="sm"
+                  onClick={handleAddToCart}
+                  disabled={product.stock === 0}
+                  className="furniture-btn-primary w-full h-9 sm:h-10 lg:h-11 text-xs sm:text-sm font-medium"
+                  data-testid={`add-to-cart-${product.id}`}
+                >
+                  <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                  <span>Add to Cart</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBuyNow}
+                  disabled={product.stock === 0}
+                  className="w-full h-9 sm:h-10 lg:h-11 text-xs sm:text-sm font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  data-testid={`buy-now-${product.id}`}
+                >
+                  <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                  <span>Buy Now</span>
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>

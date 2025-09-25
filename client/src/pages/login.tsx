@@ -22,6 +22,10 @@ export default function Login() {
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading, isAuthenticated } = useAuth();
+  
+  // Get redirect parameter from URL using location search
+  const searchParams = new URLSearchParams(window?.location?.search || '');
+  const redirectUrl = searchParams.get('redirect') || '/';
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -34,14 +38,14 @@ export default function Login() {
 
   // Redirect if already authenticated
   if (isAuthenticated) {
-    navigate("/");
+    navigate(redirectUrl);
     return null;
   }
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       await login(data);
-      navigate("/");
+      navigate(redirectUrl);
     } catch (error) {
       // Error handled by useAuth hook
     }

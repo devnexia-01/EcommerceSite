@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Minus, Plus, ShoppingCart, Heart, Star, Share2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Heart, Star, Share2, ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { Link } from "wouter";
 
 export default function ProductDetail() {
   const [, params] = useRoute("/product/:slug");
+  const [, navigate] = useLocation();
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [newReview, setNewReview] = useState({ rating: 5, title: "", comment: "" });
@@ -78,12 +79,10 @@ export default function ProductDetail() {
   }
 
   const handleAddToCart = async () => {
+    // Redirect to login if not authenticated
     if (!isAuthenticated) {
-      toast({
-        title: "Please login",
-        description: "You need to be logged in to add items to cart",
-        variant: "destructive"
-      });
+      const fullPath = window.location.pathname + window.location.search + window.location.hash;
+      navigate(`/login?redirect=${encodeURIComponent(fullPath)}`);
       return;
     }
 
@@ -100,6 +99,40 @@ export default function ProductDetail() {
       await addToCart(product.id, quantity);
     } catch (error) {
       // Error handled by useCart hook
+    }
+  };
+
+  const handleBuyNow = async () => {
+    // Redirect to login if not authenticated
+    if (!isAuthenticated) {
+      const fullPath = window.location.pathname + window.location.search + window.location.hash;
+      navigate(`/login?redirect=${encodeURIComponent(fullPath)}`);
+      return;
+    }
+
+    if (product.stock === 0) {
+      toast({
+        title: "Out of stock",
+        description: "This product is currently out of stock",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await apiRequest("POST", "/api/buy-now/create-intent", {
+        productId: product.id,
+        quantity
+      });
+
+      // Redirect to buy now checkout
+      navigate(response.redirectUrl);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create purchase intent. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -313,22 +346,37 @@ export default function ProductDetail() {
                 </span>
               </div>
 
-              <div className="flex space-x-4">
-                <Button
-                  onClick={handleAddToCart}
-                  disabled={product.stock === 0}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-                  data-testid="add-to-cart"
-                >
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Add to Cart
-                </Button>
-                <Button variant="outline" size="icon" data-testid="add-to-wishlist">
-                  <Heart className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" data-testid="share-product">
-                  <Share2 className="h-4 w-4" />
-                </Button>
+              <div className="space-y-4">
+                <div className="flex flex-col space-y-3">
+                  <Button
+                    onClick={handleAddToCart}
+                    disabled={product.stock === 0}
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    data-testid="add-to-cart"
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                  <Button
+                    onClick={handleBuyNow}
+                    disabled={product.stock === 0}
+                    variant="outline"
+                    className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                    data-testid="buy-now-button"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Buy Now
+                  </Button>
+                </div>
+                
+                <div className="flex space-x-2 justify-center">
+                  <Button variant="outline" size="icon" data-testid="add-to-wishlist">
+                    <Heart className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" data-testid="share-product">
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

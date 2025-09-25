@@ -13,6 +13,7 @@ import Categories from "./pages/categories";
 import ProductDetail from "./pages/product-detail";
 import Cart from "./pages/cart";
 import Checkout from "./pages/checkout";
+import BuyNowCheckout from "./pages/buy-now-checkout";
 import Profile from "./pages/profile";
 import Admin from "./pages/admin";
 import Login from "./pages/login";
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/product/:slug" component={ProductDetail} />
       <Route path="/cart" component={Cart} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/checkout/buy-now/:intentId" component={BuyNowCheckout} />
       <Route path="/profile" component={Profile} />
       <Route path="/admin" component={Admin} />
       <Route path="/login" component={Login} />
