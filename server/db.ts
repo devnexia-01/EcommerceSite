@@ -6,10 +6,9 @@ import * as schema from "@shared/schema";
 // Configure WebSocket for Neon
 neonConfig.webSocketConstructor = ws;
 
-// Disable SSL verification in development to handle self-signed certificates
-if (process.env.NODE_ENV === 'development') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
+// SSL verification is always enabled for security
+// If you need to use self-signed certificates in development,
+// use a proper CA or configure your database with valid certificates
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
