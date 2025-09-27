@@ -22,13 +22,14 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { insertProductSchema, insertCategorySchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, createAdminUserSchema } from "@shared/schema";
 import { Link } from "wouter";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,6 +57,19 @@ export default function Admin() {
       slug: "",
       description: "",
       emoji: ""
+    }
+  });
+
+  const userForm = useForm({
+    resolver: zodResolver(createAdminUserSchema),
+    defaultValues: {
+      email: "",
+      username: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      roles: [],
+      permissions: []
     }
   });
 
@@ -154,6 +168,19 @@ export default function Admin() {
     }
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/v1/admin/users", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/users"] });
+      setIsUserDialogOpen(false);
+      userForm.reset();
+      toast({ title: "Success", description: "Admin user created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
   if (!isAuthenticated || !user?.isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -183,6 +210,10 @@ export default function Admin() {
 
   const onSubmitCategory = async (data: any) => {
     await createCategoryMutation.mutateAsync(data);
+  };
+
+  const onSubmitUser = async (data: any) => {
+    await createUserMutation.mutateAsync(data);
   };
 
   const handleEditProduct = (product: any) => {
@@ -387,10 +418,103 @@ export default function Admin() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>User Management</CardTitle>
-                <Button data-testid="add-user">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Admin User
-                </Button>
+                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="add-user">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Admin User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Add New Admin User</DialogTitle>
+                    </DialogHeader>
+                    <Form {...userForm}>
+                      <form onSubmit={userForm.handleSubmit(onSubmitUser)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={userForm.control}
+                            name="firstName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>First Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="user-first-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userForm.control}
+                            name="lastName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Last Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="user-last-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={userForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input {...field} type="email" data-testid="user-email" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userForm.control}
+                            name="username"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Username</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="user-username" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={userForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="password" data-testid="user-password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex gap-4 pt-4">
+                          <Button type="submit" disabled={createUserMutation.isPending} data-testid="submit-user">
+                            {createUserMutation.isPending ? "Creating..." : "Create Admin User"}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
                 {/* Search and Filters */}

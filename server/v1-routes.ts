@@ -22,7 +22,7 @@ import {
   formatValidationError
 } from "./validation-schemas";
 import { z } from "zod";
-import { authenticateToken } from "./auth-routes";
+import { authenticateToken, requireAdmin, AuthenticatedRequest } from "./auth-routes";
 import { nanoid } from "nanoid";
 import { db } from "./db";
 import { 
@@ -153,7 +153,7 @@ export function setupV1Routes(app: any, storage: any) {
   });
 
   // POST /api/v1/products
-  app.post("/api/v1/products", async (req: Request, res: Response) => {
+  app.post("/api/v1/products", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const validatedData = createProductSchema.parse(req.body);
       const product = await productService.createProduct(validatedData);
@@ -188,7 +188,7 @@ export function setupV1Routes(app: any, storage: any) {
   });
 
   // PUT /api/v1/products/:productId
-  app.put("/api/v1/products/:productId", async (req: Request, res: Response) => {
+  app.put("/api/v1/products/:productId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const productId = uuidSchema.parse(req.params.productId);
       const validatedData = updateProductSchema.parse(req.body);
@@ -225,7 +225,7 @@ export function setupV1Routes(app: any, storage: any) {
   });
 
   // DELETE /api/v1/products/:productId
-  app.delete("/api/v1/products/:productId", async (req: Request, res: Response) => {
+  app.delete("/api/v1/products/:productId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const productId = uuidSchema.parse(req.params.productId);
       await storage.deleteProductV1(productId);
