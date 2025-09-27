@@ -37,25 +37,60 @@ export default function BuyNowCheckout() {
     retry: false
   });
 
+  // Process COD payment for buy-now (simplified approach)
+  const processCODPayment = async () => {
+    try {
+      // Complete the buy-now intent with COD payment method
+      const response = await apiRequest("POST", "/api/buy-now/complete", { 
+        intentId: params?.intentId,
+        paymentMethod: "cod"
+      });
+      const data = await response.json();
+      
+      // Return with COD-specific response structure
+      return {
+        ...data,
+        paymentMethod: "cod",
+        paymentStatus: "pending", // COD payments are pending until delivery
+        message: "Order confirmed! Payment will be collected upon delivery."
+      };
+    } catch (error) {
+      console.error("COD payment processing error:", error);
+      throw error;
+    }
+  };
+
   const completePurchaseMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/buy-now/complete", { intentId: params?.intentId }),
+    mutationFn: async () => {
+      if (paymentMethod === "cod") {
+        return await processCODPayment();
+      } else {
+        const response = await apiRequest("POST", "/api/buy-now/complete", { 
+          intentId: params?.intentId,
+          paymentMethod: "online"
+        });
+        return await response.json();
+      }
+    },
     onSuccess: (data) => {
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/v1/cart"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buy-now/intent", params?.intentId] });
       
       toast({
-        title: "Purchase Successful!",
-        description: "Your order has been processed successfully."
+        title: paymentMethod === "cod" ? "Order Confirmed!" : "Purchase Successful!",
+        description: paymentMethod === "cod" 
+          ? "Your order has been confirmed. Payment will be collected on delivery."
+          : "Your order has been processed successfully."
       });
       
-      // Redirect to orders or success page
+      // Redirect to orders or success page  
       navigate(data.redirectUrl || '/orders');
     },
     onError: (error: any) => {
       toast({
-        title: "Purchase Failed",
-        description: error.message || "Failed to complete purchase. Please try again.",
+        title: paymentMethod === "cod" ? "Order Confirmation Failed" : "Purchase Failed",
+        description: error.message || "Failed to complete your order. Please try again.",
         variant: "destructive"
       });
     }
@@ -217,7 +252,7 @@ export default function BuyNowCheckout() {
                     {/* Online Payment Option */}
                     <div className="flex items-center justify-between p-4 border border-input rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="online" id="online-buy" />
+                        <RadioGroupItem value="online" id="online-buy" data-testid="radio-payment-online" />
                         <Label htmlFor="online-buy" className="flex-1 cursor-pointer">
                           <div className="flex items-center space-x-3">
                             <CreditCard className="h-5 w-5 text-blue-600" />
@@ -234,7 +269,7 @@ export default function BuyNowCheckout() {
                     {/* Cash on Delivery Option */}
                     <div className="flex items-center justify-between p-4 border border-input rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="cod" id="cod-buy" />
+                        <RadioGroupItem value="cod" id="cod-buy" data-testid="radio-payment-cod" />
                         <Label htmlFor="cod-buy" className="flex-1 cursor-pointer">
                           <div className="flex items-center space-x-3">
                             <Banknote className="h-5 w-5 text-green-600" />
@@ -297,7 +332,7 @@ export default function BuyNowCheckout() {
                   disabled={completePurchaseMutation.isPending}
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                   size="lg"
-                  data-testid="complete-purchase"
+                  data-testid={paymentMethod === "cod" ? "confirm-cod-order" : "complete-purchase"}
                 >
                   {completePurchaseMutation.isPending ? (
                     <LoadingSpinner size="sm" className="mr-2" />
