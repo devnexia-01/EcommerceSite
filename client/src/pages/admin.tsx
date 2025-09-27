@@ -79,14 +79,14 @@ export default function Admin() {
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const products = productsData?.products || [];
+  const products = productsData?.data?.products || productsData?.products || [];
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/v1/admin/orders"],
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const orders = ordersData?.data || [];
+  const orders = ordersData?.data || ordersData || [];
 
   const { data: categoriesData } = useQuery({
     queryKey: ["/api/categories"],
@@ -106,21 +106,21 @@ export default function Admin() {
     enabled: isAuthenticated && user?.isAdmin && activeTab === "users"
   });
 
-  const adminUsers = adminUsersData?.data || [];
+  const adminUsers = adminUsersData?.data || adminUsersData || [];
 
   const { data: auditLogsData, isLoading: auditLoading } = useQuery({
     queryKey: ["/api/v1/admin/audit/logs", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "audit"
   });
 
-  const auditLogs = auditLogsData?.data || [];
+  const auditLogs = auditLogsData?.data || auditLogsData || [];
 
   const { data: securityLogsData, isLoading: securityLoading } = useQuery({
     queryKey: ["/api/v1/admin/security/threats", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "security"
   });
 
-  const securityLogs = securityLogsData?.data || [];
+  const securityLogs = securityLogsData?.data || securityLogsData || [];
 
   const { data: systemHealth, isLoading: systemLoading } = useQuery({
     queryKey: ["/api/v1/admin/dashboard/system-health"],
@@ -1191,14 +1191,14 @@ export default function Admin() {
                       <div className="flex justify-between items-center">
                         <span>Memory Usage</span>
                         <span className="text-sm text-muted-foreground">
-                          {systemHealth?.data?.memoryUsage?.toFixed(2) || 0} MB
+                          {systemHealth?.data?.memoryUsage?.toFixed(2) || systemHealth?.memoryUsage?.toFixed(2) || 0} MB
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Uptime</span>
                         <span className="text-sm text-muted-foreground">
-                          {Math.floor((systemHealth?.data?.serverUptime || 0) / 3600)}h{' '}
-                          {Math.floor(((systemHealth?.data?.serverUptime || 0) % 3600) / 60)}m
+                          {Math.floor((systemHealth?.data?.serverUptime || systemHealth?.serverUptime || 0) / 3600)}h{' '}
+                          {Math.floor(((systemHealth?.data?.serverUptime || systemHealth?.serverUptime || 0) % 3600) / 60)}m
                         </span>
                       </div>
                     </div>
