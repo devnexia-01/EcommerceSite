@@ -260,7 +260,7 @@ export function setupAdminRoutes(app: Express) {
       });
 
       const errorCount = recentErrors.logs.filter(log => 
-        new Date(log.timestamp) > yesterday
+        log.timestamp && new Date(log.timestamp) > yesterday
       ).length;
 
       res.json({

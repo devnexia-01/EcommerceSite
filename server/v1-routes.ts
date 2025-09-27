@@ -279,7 +279,7 @@ export function setupV1Routes(app: any, storage: any) {
   });
 
   // POST /api/v1/products/:productId/variants
-  app.post("/api/v1/products/:productId/variants", async (req: Request, res: Response) => {
+  app.post("/api/v1/products/:productId/variants", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const productId = uuidSchema.parse(req.params.productId);
       const validatedData = createVariantSchema.parse(req.body);
@@ -344,7 +344,7 @@ export function setupV1Routes(app: any, storage: any) {
   });
 
   // POST /api/v1/products/:productId/media
-  app.post("/api/v1/products/:productId/media", async (req: Request, res: Response) => {
+  app.post("/api/v1/products/:productId/media", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const productId = uuidSchema.parse(req.params.productId);
       const validatedData = addMediaSchema.parse(req.body);
