@@ -30,6 +30,7 @@ export const updateProductSchema = createProductSchema.partial();
 
 export const productSearchSchema = z.object({
   query: z.string().optional(),
+  search: z.string().optional(), // Accept both search and query for compatibility
   categoryId: z.string().uuid().optional(),
   brandId: z.string().uuid().optional(),
   minPrice: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val).optional(),
@@ -40,7 +41,11 @@ export const productSearchSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   limit: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(20),
   offset: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val).default(0)
-});
+}).transform(({ search, query, ...rest }) => ({
+  ...rest,
+  // Map search to query for compatibility with ProductService, trim and normalize
+  query: (query ?? search)?.trim() || undefined
+}));
 
 // Product variant schemas
 export const createVariantSchema = z.object({
