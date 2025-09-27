@@ -967,3 +967,138 @@ export async function processGooglePay(req: AuthenticatedRequest, res: Response)
     res.status(500).json({ error: "Google Pay processing failed", details: error.message });
   }
 }
+
+// ============= CASH ON DELIVERY (COD) PAYMENT METHODS =============
+
+// Process Cash on Delivery (COD) payment
+export async function processCODPayment(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { orderId, amount, currency = "USD", deliveryAddress } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Validate order exists and belongs to user
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (order.userId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Create COD transaction record
+    const [transaction] = await db.insert(paymentTransactions).values({
+      orderId,
+      userId,
+      type: "payment",
+      status: "pending", // COD payments start as pending until delivery
+      amount,
+      currency,
+      gateway: "cod", // Use 'cod' as the gateway
+      gatewayTransactionId: `cod_${nanoid()}`,
+      paymentMethod: {
+        methodId: "cod",
+        type: "cash_on_delivery",
+      },
+      fees: {
+        processingFee: "0.00", // No processing fees for COD
+        gatewayFee: "0.00",
+        totalFee: "0.00"
+      },
+      fraud: {
+        riskScore: "0",
+        status: "passed", // COD has minimal fraud risk
+        checks: {
+          cvv: "n/a",
+          address: "verified", // Address is verified through delivery
+          postal: "verified"
+        }
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || "",
+      processedAt: new Date()
+    }).returning();
+
+    // Update order status to indicate COD payment selected
+    await db.update(orders)
+      .set({ 
+        status: "confirmed", // Order is confirmed, payment will be collected on delivery
+        paymentStatus: "pending",
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, orderId));
+
+    res.json({
+      transactionId: transaction.id,
+      status: "confirmed",
+      paymentMethod: "cash_on_delivery",
+      message: "Order confirmed. Payment will be collected upon delivery.",
+      amount: transaction.amount,
+      currency: transaction.currency,
+      deliveryInstructions: "Please have exact change ready for the delivery person."
+    });
+
+  } catch (error: any) {
+    console.error("COD payment processing error:", error);
+    res.status(500).json({ error: "Failed to process COD payment", details: error.message });
+  }
+}
+
+// Confirm COD payment upon delivery
+export async function confirmCODPayment(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { transactionId, deliveredBy } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Get COD transaction
+    const [transaction] = await db.select()
+      .from(paymentTransactions)
+      .where(and(
+        eq(paymentTransactions.id, transactionId),
+        eq(paymentTransactions.gateway, "cod"),
+        eq(paymentTransactions.status, "pending")
+      ));
+
+    if (!transaction) {
+      return res.status(404).json({ error: "COD transaction not found or already processed" });
+    }
+
+    // Update transaction status to success
+    await db.update(paymentTransactions)
+      .set({
+        status: "success",
+        processedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(paymentTransactions.id, transactionId));
+
+    // Update order status to paid
+    await db.update(orders)
+      .set({ 
+        status: "paid",
+        paymentStatus: "paid",
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, transaction.orderId));
+
+    res.json({
+      transactionId: transaction.id,
+      status: "success",
+      message: "COD payment confirmed successfully",
+      paidAt: new Date().toISOString(),
+      deliveredBy
+    });
+
+  } catch (error: any) {
+    console.error("COD payment confirmation error:", error);
+    res.status(500).json({ error: "Failed to confirm COD payment", details: error.message });
+  }
+}

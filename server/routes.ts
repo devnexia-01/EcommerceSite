@@ -35,7 +35,9 @@ import {
   deletePaymentMethod,
   process3DSecure,
   processApplePay,
-  processGooglePay
+  processGooglePay,
+  processCODPayment,
+  confirmCODPayment
 } from "./payment-service";
 import WebSocketService from "./services/websocket-service";
 
@@ -112,6 +114,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Wallet Payments
   app.post("/api/v1/payments/wallet/apple-pay", authenticateToken, processApplePay);
   app.post("/api/v1/payments/wallet/google-pay", authenticateToken, processGooglePay);
+  
+  // Cash on Delivery (COD) Payments
+  app.post("/api/v1/payments/cod", authenticateToken, processCODPayment);
+  app.post("/api/v1/payments/cod/confirm", authenticateToken, confirmCODPayment);
   
   // Setup wishlist routes
   const { default: wishlistRoutes } = await import("./wishlist-routes.js");

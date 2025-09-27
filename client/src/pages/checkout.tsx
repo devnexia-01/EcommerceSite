@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Check, CreditCard, Truck, Package } from "lucide-react";
+import { Check, CreditCard, Truck, Package, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,7 @@ export default function Checkout() {
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [useNewAddress, setUseNewAddress] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("online"); // "online" or "cod"
   const { items, totalPrice, clearCart } = useCart();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
@@ -153,6 +154,42 @@ export default function Checkout() {
                   subtotal > 4000 ? 0 : 800; // Free shipping over ₹40
   const tax = subtotal * 0.18; // 18% GST for India
   const total = subtotal + shipping + tax;
+
+  // Process Cash on Delivery payment
+  const processCODPayment = async (orderData: any) => {
+    try {
+      // Create order first
+      const orderResponse = await apiRequest("POST", "/api/v1/orders", orderData);
+      const order = await orderResponse.json();
+      
+      // Process COD payment
+      const codResponse = await apiRequest("POST", "/api/v1/payments/cod", {
+        orderId: order.id,
+        amount: orderData.total,
+        currency: "INR",
+        deliveryAddress: orderData.shippingAddress
+      });
+      
+      const codResult = await codResponse.json();
+      
+      if (codResult.status === "confirmed") {
+        clearCart();
+        navigate(`/order-confirmation/${order.id}`);
+        toast({
+          title: "Order confirmed!",
+          description: codResult.message
+        });
+      } else {
+        throw new Error("COD payment processing failed");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Order failed",
+        description: error.message || "Failed to process COD order. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const initiateRazorpayPayment = async (orderData: any) => {
     try {
@@ -283,7 +320,11 @@ export default function Checkout() {
           email: validData.email
         };
 
-        await initiateRazorpayPayment(orderData);
+        if (paymentMethod === "cod") {
+          await processCODPayment(orderData);
+        } else {
+          await initiateRazorpayPayment(orderData);
+        }
       }
     } catch (error) {
       // Handle validation errors
@@ -573,37 +614,96 @@ export default function Checkout() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
-                      Payment Options
+                      Payment Method
                     </CardTitle>
                   </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
-                    <h4 className="font-medium">Multiple Payment Methods Available</h4>
-                    <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>UPI Payments</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span>Credit/Debit Cards</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        <span>Digital Wallets</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        <span>Net Banking</span>
-                      </div>
+                  <CardContent className="space-y-6">
+                    {/* Payment Method Selection */}
+                    <div className="space-y-4">
+                      <RadioGroup
+                        value={paymentMethod}
+                        onValueChange={setPaymentMethod}
+                        className="space-y-3"
+                      >
+                        {/* Online Payment Option */}
+                        <div className="flex items-center justify-between p-4 border border-input rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="online" id="online" />
+                            <Label htmlFor="online" className="flex-1 cursor-pointer">
+                              <div className="flex items-center space-x-3">
+                                <CreditCard className="h-5 w-5 text-blue-600" />
+                                <div>
+                                  <p className="font-medium">Online Payment</p>
+                                  <p className="text-sm text-muted-foreground">UPI, Cards, Wallets, Net Banking</p>
+                                </div>
+                              </div>
+                            </Label>
+                          </div>
+                          <div className="text-sm text-green-600 font-medium">Secure</div>
+                        </div>
+                        
+                        {/* Cash on Delivery Option */}
+                        <div className="flex items-center justify-between p-4 border border-input rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="cod" id="cod" />
+                            <Label htmlFor="cod" className="flex-1 cursor-pointer">
+                              <div className="flex items-center space-x-3">
+                                <Banknote className="h-5 w-5 text-green-600" />
+                                <div>
+                                  <p className="font-medium">Cash on Delivery</p>
+                                  <p className="text-sm text-muted-foreground">Pay when your order arrives</p>
+                                </div>
+                              </div>
+                            </Label>
+                          </div>
+                          <div className="text-sm text-blue-600 font-medium">No fees</div>
+                        </div>
+                      </RadioGroup>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      You'll be redirected to our secure payment gateway to complete your purchase. 
-                      No card details needed upfront!
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+
+                    {/* Payment Method Details */}
+                    {paymentMethod === "online" && (
+                      <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                        <h4 className="font-medium">Online Payment Options</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span>UPI Payments</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span>Credit/Debit Cards</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                            <span>Digital Wallets</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                            <span>Net Banking</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          You'll be redirected to our secure payment gateway to complete your purchase.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {paymentMethod === "cod" && (
+                      <div className="space-y-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <h4 className="font-medium text-green-800">Cash on Delivery</h4>
+                        <div className="text-sm text-green-700">
+                          <p className="mb-2">✓ No online payment required</p>
+                          <p className="mb-2">✓ Pay cash when your order is delivered</p>
+                          <p className="mb-2">✓ No additional processing fees</p>
+                          <p className="text-xs text-green-600 mt-3">
+                            <strong>Note:</strong> Please have exact change ready for the delivery person.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
             </div>
 
