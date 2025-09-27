@@ -206,7 +206,33 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       setIsCategoryDialogOpen(false);
       categoryForm.reset();
+      setEditingCategory(null);
       toast({ title: "Success", description: "Category created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => apiRequest("PUT", `/api/categories/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      setIsCategoryDialogOpen(false);
+      categoryForm.reset();
+      setEditingCategory(null);
+      toast({ title: "Success", description: "Category updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/categories/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      toast({ title: "Success", description: "Category deleted successfully" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -254,7 +280,28 @@ export default function Admin() {
   };
 
   const onSubmitCategory = async (data: any) => {
-    await createCategoryMutation.mutateAsync(data);
+    if (editingCategory) {
+      await updateCategoryMutation.mutateAsync({ id: editingCategory.id, data });
+    } else {
+      await createCategoryMutation.mutateAsync(data);
+    }
+  };
+
+  const handleEditCategory = (category: any) => {
+    setEditingCategory(category);
+    categoryForm.reset({
+      name: category.name,
+      slug: category.slug,
+      description: category.description || "",
+      emoji: category.emoji || ""
+    });
+    setIsCategoryDialogOpen(true);
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (window.confirm("Are you sure you want to delete this category? This action cannot be undone.")) {
+      await deleteCategoryMutation.mutateAsync(categoryId);
+    }
   };
 
   const onSubmitUser = async (data: any) => {
@@ -1464,16 +1511,31 @@ export default function Admin() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Category Management</CardTitle>
-                <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                <Dialog 
+                  open={isCategoryDialogOpen} 
+                  onOpenChange={(open) => {
+                    setIsCategoryDialogOpen(open);
+                    if (!open) {
+                      setEditingCategory(null);
+                      categoryForm.reset();
+                    }
+                  }}
+                >
                   <DialogTrigger asChild>
-                    <Button data-testid="add-category">
+                    <Button 
+                      onClick={() => {
+                        setEditingCategory(null);
+                        categoryForm.reset();
+                      }}
+                      data-testid="add-category"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Category
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Add New Category</DialogTitle>
+                      <DialogTitle>{editingCategory ? "Edit Category" : "Add New Category"}</DialogTitle>
                     </DialogHeader>
                     <Form {...categoryForm}>
                       <form onSubmit={categoryForm.handleSubmit(onSubmitCategory)} className="space-y-4">
@@ -1539,10 +1601,15 @@ export default function Admin() {
                           </Button>
                           <Button 
                             type="submit"
-                            disabled={createCategoryMutation.isPending}
+                            disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
                             data-testid="save-category"
                           >
-                            {createCategoryMutation.isPending ? "Saving..." : "Save Category"}
+                            {(createCategoryMutation.isPending || updateCategoryMutation.isPending) 
+                              ? "Saving..." 
+                              : editingCategory 
+                                ? "Update Category" 
+                                : "Save Category"
+                            }
                           </Button>
                         </div>
                       </form>
@@ -1573,10 +1640,21 @@ export default function Admin() {
                         <TableCell className="max-w-[300px] truncate">{category.description}</TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleEditCategory(category)}
+                              data-testid={`edit-category-${category.id}`}
+                            >
                               <Edit className="h-3 w-3" />
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDeleteCategory(category.id)}
+                              disabled={deleteCategoryMutation.isPending}
+                              data-testid={`delete-category-${category.id}`}
+                            >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
