@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ShoppingCart, CreditCard, Truck } from "lucide-react";
+import { ArrowLeft, ShoppingCart, CreditCard, Truck, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,6 +17,7 @@ import { Link } from "wouter";
 export default function BuyNowCheckout() {
   const [, params] = useRoute("/checkout/buy-now/:intentId");
   const [, navigate] = useLocation();
+  const [paymentMethod, setPaymentMethod] = useState("online"); // "online" or "cod"
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -204,15 +207,90 @@ export default function BuyNowCheckout() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="text-center py-8 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-                  <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-4">
-                    Payment integration placeholder
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-6">
-                    In a real application, this would integrate with Stripe, PayPal, or other payment processors
-                  </p>
+                {/* Payment Method Selection */}
+                <div className="space-y-4">
+                  <RadioGroup
+                    value={paymentMethod}
+                    onValueChange={setPaymentMethod}
+                    className="space-y-3"
+                  >
+                    {/* Online Payment Option */}
+                    <div className="flex items-center justify-between p-4 border border-input rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="online" id="online-buy" />
+                        <Label htmlFor="online-buy" className="flex-1 cursor-pointer">
+                          <div className="flex items-center space-x-3">
+                            <CreditCard className="h-5 w-5 text-blue-600" />
+                            <div>
+                              <p className="font-medium">Online Payment</p>
+                              <p className="text-sm text-muted-foreground">UPI, Cards, Wallets, Net Banking</p>
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                      <div className="text-sm text-green-600 font-medium">Secure</div>
+                    </div>
+                    
+                    {/* Cash on Delivery Option */}
+                    <div className="flex items-center justify-between p-4 border border-input rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="cod" id="cod-buy" />
+                        <Label htmlFor="cod-buy" className="flex-1 cursor-pointer">
+                          <div className="flex items-center space-x-3">
+                            <Banknote className="h-5 w-5 text-green-600" />
+                            <div>
+                              <p className="font-medium">Cash on Delivery</p>
+                              <p className="text-sm text-muted-foreground">Pay when your order arrives</p>
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                      <div className="text-sm text-blue-600 font-medium">No fees</div>
+                    </div>
+                  </RadioGroup>
                 </div>
+
+                {/* Payment Method Details */}
+                {paymentMethod === "online" && (
+                  <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                    <h4 className="font-medium">Online Payment Options</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>UPI Payments</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span>Credit/Debit Cards</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span>Digital Wallets</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span>Net Banking</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      You'll be redirected to our secure payment gateway to complete your purchase.
+                    </p>
+                  </div>
+                )}
+                
+                {paymentMethod === "cod" && (
+                  <div className="space-y-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h4 className="font-medium text-green-800">Cash on Delivery</h4>
+                    <div className="text-sm text-green-700">
+                      <p className="mb-2">✓ No online payment required</p>
+                      <p className="mb-2">✓ Pay cash when your order is delivered</p>
+                      <p className="mb-2">✓ No additional processing fees</p>
+                      <p className="text-xs text-green-600 mt-3">
+                        <strong>Note:</strong> Please have exact change ready for the delivery person.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <Button
                   onClick={() => completePurchaseMutation.mutate()}
@@ -223,10 +301,17 @@ export default function BuyNowCheckout() {
                 >
                   {completePurchaseMutation.isPending ? (
                     <LoadingSpinner size="sm" className="mr-2" />
+                  ) : paymentMethod === "cod" ? (
+                    <Banknote className="h-4 w-4 mr-2" />
                   ) : (
                     <CreditCard className="h-4 w-4 mr-2" />
                   )}
-                  {completePurchaseMutation.isPending ? 'Processing...' : `Complete Purchase - $${(totalPrice + (totalPrice >= 50 ? 0 : 9.99)).toFixed(2)}`}
+                  {completePurchaseMutation.isPending 
+                    ? 'Processing...' 
+                    : paymentMethod === "cod" 
+                      ? `Confirm Order - $${(totalPrice + (totalPrice >= 50 ? 0 : 9.99)).toFixed(2)}` 
+                      : `Complete Purchase - $${(totalPrice + (totalPrice >= 50 ? 0 : 9.99)).toFixed(2)}`
+                  }
                 </Button>
 
                 <p className="text-xs text-muted-foreground text-center">
