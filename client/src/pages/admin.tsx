@@ -79,14 +79,14 @@ export default function Admin() {
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const products = productsData?.data?.products || productsData?.products || [];
+  const products = (productsData as any)?.data?.products || (productsData as any)?.products || [];
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/v1/admin/orders"],
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const orders = ordersData?.data || ordersData || [];
+  const orders = (ordersData as any)?.data || (ordersData as any) || [];
 
   const { data: categoriesData } = useQuery({
     queryKey: ["/api/categories"],
@@ -106,21 +106,21 @@ export default function Admin() {
     enabled: isAuthenticated && user?.isAdmin && activeTab === "users"
   });
 
-  const adminUsers = adminUsersData?.data || adminUsersData || [];
+  const adminUsers = (adminUsersData as any)?.data || (adminUsersData as any) || [];
 
   const { data: auditLogsData, isLoading: auditLoading } = useQuery({
     queryKey: ["/api/v1/admin/audit/logs", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "audit"
   });
 
-  const auditLogs = auditLogsData?.data || auditLogsData || [];
+  const auditLogs = (auditLogsData as any)?.data || (auditLogsData as any) || [];
 
   const { data: securityLogsData, isLoading: securityLoading } = useQuery({
     queryKey: ["/api/v1/admin/security/threats", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "security"
   });
 
-  const securityLogs = securityLogsData?.data || securityLogsData || [];
+  const securityLogs = (securityLogsData as any)?.data || (securityLogsData as any) || [];
 
   const { data: systemHealth, isLoading: systemLoading } = useQuery({
     queryKey: ["/api/v1/admin/dashboard/system-health"],
@@ -229,7 +229,8 @@ export default function Admin() {
   };
 
   const handleEditProduct = (product: any) => {
-    setEditingProduct(product);
+    const productWithId = { ...product, id: product.productId || product.id };
+    setEditingProduct(productWithId);
     productForm.reset({
       name: product.name,
       description: product.description || "",
@@ -258,15 +259,15 @@ export default function Admin() {
     }
   };
 
-  const stats = dashboardOverview?.data ? {
-    totalProducts: dashboardOverview.data.totalProducts || 0,
-    totalUsers: dashboardOverview.data.totalUsers || 0,
-    totalOrders: dashboardOverview.data.totalOrders || 0,
-    totalRevenue: dashboardOverview.data.totalRevenue || 0,
-    newUsersToday: dashboardOverview.data.newUsersToday || 0,
-    ordersToday: dashboardOverview.data.ordersToday || 0,
-    revenueToday: dashboardOverview.data.revenueToday || 0,
-    totalActiveUsers: dashboardOverview.data.totalActiveUsers || 0
+  const stats = (dashboardOverview as any)?.data ? {
+    totalProducts: (dashboardOverview as any).data.totalProducts || 0,
+    totalUsers: (dashboardOverview as any).data.totalUsers || 0,
+    totalOrders: (dashboardOverview as any).data.totalOrders || 0,
+    totalRevenue: (dashboardOverview as any).data.totalRevenue || 0,
+    newUsersToday: (dashboardOverview as any).data.newUsersToday || 0,
+    ordersToday: (dashboardOverview as any).data.ordersToday || 0,
+    revenueToday: (dashboardOverview as any).data.revenueToday || 0,
+    totalActiveUsers: (dashboardOverview as any).data.totalActiveUsers || 0
   } : {
     totalProducts: products?.length || 0,
     totalUsers: 0,
@@ -809,7 +810,7 @@ export default function Admin() {
                     </TableHeader>
                     <TableBody>
                       {products?.map((product: any) => (
-                        <TableRow key={product.id} data-testid={`product-row-${product.id}`}>
+                        <TableRow key={product.productId || product.id} data-testid={`product-row-${product.productId || product.id}`}>
                           <TableCell>
                             <div className="flex items-center space-x-3">
                               <img
@@ -840,15 +841,15 @@ export default function Admin() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditProduct(product)}
-                                data-testid={`edit-product-${product.id}`}
+                                data-testid={`edit-product-${product.productId || product.id}`}
                               >
                                 <Edit className="h-3 w-3" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDeleteProduct(product.id)}
-                                data-testid={`delete-product-${product.id}`}
+                                onClick={() => handleDeleteProduct(product.productId || product.id)}
+                                data-testid={`delete-product-${product.productId || product.id}`}
                               >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
@@ -1191,14 +1192,14 @@ export default function Admin() {
                       <div className="flex justify-between items-center">
                         <span>Memory Usage</span>
                         <span className="text-sm text-muted-foreground">
-                          {systemHealth?.data?.memoryUsage?.toFixed(2) || systemHealth?.memoryUsage?.toFixed(2) || 0} MB
+                          {(systemHealth as any)?.data?.memoryUsage?.toFixed(2) || (systemHealth as any)?.memoryUsage?.toFixed(2) || 0} MB
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Uptime</span>
                         <span className="text-sm text-muted-foreground">
-                          {Math.floor((systemHealth?.data?.serverUptime || systemHealth?.serverUptime || 0) / 3600)}h{' '}
-                          {Math.floor(((systemHealth?.data?.serverUptime || systemHealth?.serverUptime || 0) % 3600) / 60)}m
+                          {Math.floor(((systemHealth as any)?.data?.serverUptime || (systemHealth as any)?.serverUptime || 0) / 3600)}h{' '}
+                          {Math.floor((((systemHealth as any)?.data?.serverUptime || (systemHealth as any)?.serverUptime || 0) % 3600) / 60)}m
                         </span>
                       </div>
                     </div>
