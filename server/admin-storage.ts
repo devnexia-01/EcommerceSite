@@ -1,25 +1,37 @@
 import { 
   adminRoles, adminUsers, adminPermissions, systemConfig, auditLogs, content,
   media, userActivity, securityLogs, ipBlacklist, backupLogs, users, orders,
-  type AdminRole, type InsertAdminRole,
-  type AdminUser, type InsertAdminUser,
-  type SystemConfig, type InsertSystemConfig,
-  type AuditLog, type InsertAuditLog,
-  type Content, type InsertContent,
-  type Media, type InsertMedia,
-  type UserActivity, type InsertUserActivity,
-  type SecurityLog, type InsertSecurityLog,
-  type IpBlacklist, type InsertIpBlacklist,
-  type BackupLog, type InsertBackupLog,
   type User
 } from "@shared/schema";
+
+// Use Drizzle inferred types instead of Zod types
+export type AdminRole = typeof adminRoles.$inferSelect;
+export type InsertAdminRole = typeof adminRoles.$inferInsert;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = typeof adminUsers.$inferInsert;
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = typeof systemConfig.$inferInsert;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+export type Content = typeof content.$inferSelect;
+export type InsertContent = typeof content.$inferInsert;
+export type Media = typeof media.$inferSelect;
+export type InsertMedia = typeof media.$inferInsert;
+export type UserActivity = typeof userActivity.$inferSelect;
+export type InsertUserActivity = typeof userActivity.$inferInsert;
+export type SecurityLog = typeof securityLogs.$inferSelect;
+export type InsertSecurityLog = typeof securityLogs.$inferInsert;
+export type IpBlacklist = typeof ipBlacklist.$inferSelect;
+export type InsertIpBlacklist = typeof ipBlacklist.$inferInsert;
+export type BackupLog = typeof backupLogs.$inferSelect;
+export type InsertBackupLog = typeof backupLogs.$inferInsert;
 import { db } from "./db";
 import { eq, desc, asc, ilike, and, sql, count, or, gte, lte } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 export class AdminStorage {
   // Admin Management
-  async createAdminUser(userId: string, adminData: InsertAdminUser): Promise<AdminUser> {
+  async createAdminUser(userId: string, adminData: Omit<InsertAdminUser, 'userId' | 'id' | 'createdAt' | 'updatedAt'>): Promise<AdminUser> {
     const [adminUser] = await db.insert(adminUsers).values({
       ...adminData,
       userId
@@ -32,9 +44,18 @@ export class AdminStorage {
     return adminUser;
   }
 
-  async updateAdminUser(userId: string, adminData: Partial<InsertAdminUser>): Promise<AdminUser> {
+  async updateAdminUser(userId: string, adminData: Partial<Omit<InsertAdminUser, 'userId' | 'id'>>): Promise<AdminUser> {
+    const updateData: Partial<typeof adminUsers.$inferInsert> = {
+      updatedAt: new Date()
+    };
+    
+    // Only include defined fields to avoid type issues
+    if (adminData.roles !== undefined) updateData.roles = adminData.roles;
+    if (adminData.permissions !== undefined) updateData.permissions = adminData.permissions;
+    if (adminData.lastLoginAt !== undefined) updateData.lastLoginAt = adminData.lastLoginAt;
+    
     const [adminUser] = await db.update(adminUsers)
-      .set({ ...adminData, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(adminUsers.userId, userId))
       .returning();
     return adminUser;
@@ -56,8 +77,8 @@ export class AdminStorage {
   }
 
   // Roles & Permissions
-  async createRole(role: InsertAdminRole): Promise<AdminRole> {
-    const [newRole] = await db.insert(adminRoles).values(role).returning();
+  async createRole(roleData: Omit<InsertAdminRole, 'id' | 'createdAt' | 'updatedAt'>): Promise<AdminRole> {
+    const [newRole] = await db.insert(adminRoles).values(roleData).returning();
     return newRole;
   }
 
@@ -70,9 +91,19 @@ export class AdminStorage {
     return role;
   }
 
-  async updateRole(id: string, role: Partial<InsertAdminRole>): Promise<AdminRole> {
+  async updateRole(id: string, roleData: Partial<Omit<InsertAdminRole, 'id'>>): Promise<AdminRole> {
+    const updateData: Partial<typeof adminRoles.$inferInsert> = {
+      updatedAt: new Date()
+    };
+    
+    // Only include defined fields
+    if (roleData.name !== undefined) updateData.name = roleData.name;
+    if (roleData.description !== undefined) updateData.description = roleData.description;
+    if (roleData.permissions !== undefined) updateData.permissions = roleData.permissions;
+    if (roleData.isSystem !== undefined) updateData.isSystem = roleData.isSystem;
+    
     const [updatedRole] = await db.update(adminRoles)
-      .set({ ...role, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(adminRoles.id, id))
       .returning();
     return updatedRole;
@@ -87,25 +118,23 @@ export class AdminStorage {
   }
 
   async assignRoleToUser(userId: string, roleId: string): Promise<void> {
-    const adminUser = await this.getAdminUser(userId);
-    if (adminUser) {
-      const currentRoles = adminUser.roles || [];
-      if (!currentRoles.includes(roleId)) {
-        await this.updateAdminUser(userId, {
-          roles: [...currentRoles, roleId]
-        });
-      }
-    }
+    // Use atomic SQL operation to prevent race conditions
+    await db.update(adminUsers)
+      .set({
+        roles: sql<string[]>`CASE WHEN NOT (${roleId}::text = ANY(${adminUsers.roles})) THEN ${adminUsers.roles} || ARRAY[${roleId}::text] ELSE ${adminUsers.roles} END`,
+        updatedAt: new Date()
+      })
+      .where(eq(adminUsers.userId, userId));
   }
 
   async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
-    const adminUser = await this.getAdminUser(userId);
-    if (adminUser) {
-      const currentRoles = adminUser.roles || [];
-      await this.updateAdminUser(userId, {
-        roles: currentRoles.filter(id => id !== roleId)
-      });
-    }
+    // Use atomic SQL operation to prevent race conditions
+    await db.update(adminUsers)
+      .set({
+        roles: sql<string[]>`array_remove(${adminUsers.roles}, ${roleId}::text)`,
+        updatedAt: new Date()
+      })
+      .where(eq(adminUsers.userId, userId));
   }
 
   // User Management (Admin)
@@ -119,31 +148,44 @@ export class AdminStorage {
   } = {}): Promise<{ users: User[]; total: number }> {
     const { search, sortBy = 'createdAt', sortOrder = 'desc', limit = 50, offset = 0 } = params;
 
-    let query = db.select().from(users);
-    let countQuery = db.select({ count: count() }).from(users);
+    const conditions: any[] = [];
 
     if (search) {
-      const searchCondition = or(
-        ilike(users.email, `%${search}%`),
-        ilike(users.username, `%${search}%`),
-        ilike(users.firstName, `%${search}%`),
-        ilike(users.lastName, `%${search}%`)
+      conditions.push(
+        or(
+          ilike(users.email, `%${search}%`),
+          ilike(users.username, `%${search}%`),
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`)
+        )
       );
-      query = query.where(searchCondition);
-      countQuery = countQuery.where(searchCondition);
+    }
+
+    const whereCondition = conditions.length === 1 ? conditions[0] : 
+                           conditions.length > 1 ? and(...conditions) : undefined;
+
+    let baseQuery = db.select().from(users);
+    let countBaseQuery = db.select({ count: count() }).from(users);
+
+    if (whereCondition) {
+      baseQuery = baseQuery.where(whereCondition);
+      countBaseQuery = countBaseQuery.where(whereCondition);
     }
 
     // Apply sorting
-    const sortColumn = users[sortBy as keyof typeof users] || users.createdAt;
-    const sortDirection = sortOrder === 'asc' ? asc : desc;
-    query = query.orderBy(sortDirection(sortColumn));
-
-    // Apply pagination
-    query = query.limit(limit).offset(offset);
+    const sortMap = {
+      email: users.email,
+      username: users.username,
+      createdAt: users.createdAt,
+      lastLoginAt: users.lastLoginAt
+    } as const;
+    
+    const sortColumn = sortMap[sortBy as keyof typeof sortMap] ?? users.createdAt;
+    const finalQuery = baseQuery.orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn)).limit(limit).offset(offset);
 
     const [usersResult, totalResult] = await Promise.all([
-      query,
-      countQuery
+      finalQuery,
+      countBaseQuery
     ]);
 
     return {
@@ -238,10 +280,7 @@ export class AdminStorage {
   } = {}): Promise<{ content: Content[]; total: number }> {
     const { type, status, search, limit = 50, offset = 0 } = params;
 
-    let query = db.select().from(content);
-    let countQuery = db.select({ count: count() }).from(content);
-
-    const conditions = [];
+    const conditions: any[] = [];
     
     if (type) {
       conditions.push(eq(content.type, type));
@@ -261,17 +300,22 @@ export class AdminStorage {
       );
     }
 
-    if (conditions.length > 0) {
-      const whereCondition = conditions.length === 1 ? conditions[0] : and(...conditions);
-      query = query.where(whereCondition);
-      countQuery = countQuery.where(whereCondition);
+    const whereCondition = conditions.length === 1 ? conditions[0] : 
+                           conditions.length > 1 ? and(...conditions) : undefined;
+
+    let baseQuery = db.select().from(content);
+    let countBaseQuery = db.select({ count: count() }).from(content);
+
+    if (whereCondition) {
+      baseQuery = baseQuery.where(whereCondition);
+      countBaseQuery = countBaseQuery.where(whereCondition);
     }
 
-    query = query.orderBy(desc(content.createdAt)).limit(limit).offset(offset);
+    const finalQuery = baseQuery.orderBy(desc(content.createdAt)).limit(limit).offset(offset);
 
     const [contentResult, totalResult] = await Promise.all([
-      query,
-      countQuery
+      finalQuery,
+      countBaseQuery
     ]);
 
     return {
@@ -334,10 +378,7 @@ export class AdminStorage {
   } = {}): Promise<{ media: Media[]; total: number }> {
     const { search, mimeType, limit = 50, offset = 0 } = params;
 
-    let query = db.select().from(media);
-    let countQuery = db.select({ count: count() }).from(media);
-
-    const conditions = [];
+    const conditions: any[] = [];
     
     if (search) {
       conditions.push(
@@ -353,17 +394,22 @@ export class AdminStorage {
       conditions.push(ilike(media.mimeType, `%${mimeType}%`));
     }
 
-    if (conditions.length > 0) {
-      const whereCondition = conditions.length === 1 ? conditions[0] : and(...conditions);
-      query = query.where(whereCondition);
-      countQuery = countQuery.where(whereCondition);
+    const whereCondition = conditions.length === 1 ? conditions[0] : 
+                           conditions.length > 1 ? and(...conditions) : undefined;
+
+    let baseQuery = db.select().from(media);
+    let countBaseQuery = db.select({ count: count() }).from(media);
+
+    if (whereCondition) {
+      baseQuery = baseQuery.where(whereCondition);
+      countBaseQuery = countBaseQuery.where(whereCondition);
     }
 
-    query = query.orderBy(desc(media.createdAt)).limit(limit).offset(offset);
+    const finalQuery = baseQuery.orderBy(desc(media.createdAt)).limit(limit).offset(offset);
 
     const [mediaResult, totalResult] = await Promise.all([
-      query,
-      countQuery
+      finalQuery,
+      countBaseQuery
     ]);
 
     return {
@@ -377,7 +423,7 @@ export class AdminStorage {
     return mediaItem;
   }
 
-  async createMedia(mediaData: InsertMedia): Promise<Media> {
+  async createMedia(mediaData: Omit<InsertMedia, 'id' | 'createdAt'>): Promise<Media> {
     const [newMedia] = await db.insert(media).values(mediaData).returning();
     return newMedia;
   }
@@ -443,8 +489,8 @@ export class AdminStorage {
   }
 
   // Audit Logs
-  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
-    const [auditLog] = await db.insert(auditLogs).values(log).returning();
+  async createAuditLog(logData: Omit<InsertAuditLog, 'id' | 'timestamp'>): Promise<AuditLog> {
+    const [auditLog] = await db.insert(auditLogs).values(logData).returning();
     return auditLog;
   }
 
@@ -460,10 +506,7 @@ export class AdminStorage {
   } = {}): Promise<{ logs: AuditLog[]; total: number }> {
     const { action, resource, actorId, severity, startDate, endDate, limit = 50, offset = 0 } = params;
 
-    let query = db.select().from(auditLogs);
-    let countQuery = db.select({ count: count() }).from(auditLogs);
-
-    const conditions = [];
+    const conditions: any[] = [];
     
     if (action) conditions.push(eq(auditLogs.action, action));
     if (resource) conditions.push(eq(auditLogs.resource, resource));
@@ -472,17 +515,22 @@ export class AdminStorage {
     if (startDate) conditions.push(gte(auditLogs.timestamp, startDate));
     if (endDate) conditions.push(lte(auditLogs.timestamp, endDate));
 
-    if (conditions.length > 0) {
-      const whereCondition = conditions.length === 1 ? conditions[0] : and(...conditions);
-      query = query.where(whereCondition);
-      countQuery = countQuery.where(whereCondition);
+    const whereCondition = conditions.length === 1 ? conditions[0] : 
+                           conditions.length > 1 ? and(...conditions) : undefined;
+
+    let baseQuery = db.select().from(auditLogs);
+    let countBaseQuery = db.select({ count: count() }).from(auditLogs);
+
+    if (whereCondition) {
+      baseQuery = baseQuery.where(whereCondition);
+      countBaseQuery = countBaseQuery.where(whereCondition);
     }
 
-    query = query.orderBy(desc(auditLogs.timestamp)).limit(limit).offset(offset);
+    const finalQuery = baseQuery.orderBy(desc(auditLogs.timestamp)).limit(limit).offset(offset);
 
     const [logsResult, totalResult] = await Promise.all([
-      query,
-      countQuery
+      finalQuery,
+      countBaseQuery
     ]);
 
     return {
