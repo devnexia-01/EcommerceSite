@@ -74,20 +74,26 @@ export default function Admin() {
   });
 
   // Queries
-  const { data: products = [], isLoading: productsLoading } = useQuery({
+  const { data: productsData = { products: [], total: 0 }, isLoading: productsLoading } = useQuery({
     queryKey: ["/api/v1/products", { limit: 100, search: searchQuery }],
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["/api/admin/orders"],
+  const products = productsData?.products || [];
+
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+    queryKey: ["/api/v1/admin/orders"],
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const { data: categories = [] } = useQuery({
+  const orders = ordersData?.data || [];
+
+  const { data: categoriesData } = useQuery({
     queryKey: ["/api/categories"],
     enabled: isAuthenticated && user?.isAdmin
   });
+
+  const categories = Array.isArray(categoriesData) ? categoriesData : [];
 
   // Admin Dashboard Data
   const { data: dashboardOverview, isLoading: dashboardLoading } = useQuery({
@@ -95,20 +101,26 @@ export default function Admin() {
     enabled: isAuthenticated && user?.isAdmin
   });
 
-  const { data: adminUsers = [], isLoading: usersLoading } = useQuery({
+  const { data: adminUsersData, isLoading: usersLoading } = useQuery({
     queryKey: ["/api/v1/admin/users", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "users"
   });
 
-  const { data: auditLogs = [], isLoading: auditLoading } = useQuery({
+  const adminUsers = adminUsersData?.data || [];
+
+  const { data: auditLogsData, isLoading: auditLoading } = useQuery({
     queryKey: ["/api/v1/admin/audit/logs", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "audit"
   });
 
-  const { data: securityLogs = [], isLoading: securityLoading } = useQuery({
+  const auditLogs = auditLogsData?.data || [];
+
+  const { data: securityLogsData, isLoading: securityLoading } = useQuery({
     queryKey: ["/api/v1/admin/security/threats", { limit: 50 }],
     enabled: isAuthenticated && user?.isAdmin && activeTab === "security"
   });
+
+  const securityLogs = securityLogsData?.data || [];
 
   const { data: systemHealth, isLoading: systemLoading } = useQuery({
     queryKey: ["/api/v1/admin/dashboard/system-health"],
@@ -256,10 +268,10 @@ export default function Admin() {
     revenueToday: dashboardOverview.data.revenueToday || 0,
     totalActiveUsers: dashboardOverview.data.totalActiveUsers || 0
   } : {
-    totalProducts: products.products?.length || 0,
+    totalProducts: products?.length || 0,
     totalUsers: 0,
-    totalOrders: orders.length || 0,
-    totalRevenue: orders.reduce((sum: number, order: any) => sum + parseFloat(order.total || 0), 0),
+    totalOrders: Array.isArray(orders) ? orders.length : 0,
+    totalRevenue: Array.isArray(orders) ? orders.reduce((sum: number, order: any) => sum + parseFloat(order.total || 0), 0) : 0,
     newUsersToday: 0,
     ordersToday: 0,
     revenueToday: 0,
@@ -555,7 +567,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {adminUsers.data?.map((user: any) => (
+                      {Array.isArray(adminUsers) ? adminUsers.map((user: any) => (
                         <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
                           <TableCell>
                             <div className="flex items-center space-x-3">
@@ -609,7 +621,13 @@ export default function Admin() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            No users found
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 )}
@@ -725,11 +743,11 @@ export default function Admin() {
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    {categories.map((category: any) => (
+                                    {Array.isArray(categories) ? categories.map((category: any) => (
                                       <SelectItem key={category.id} value={category.id}>
                                         {category.name}
                                       </SelectItem>
-                                    ))}
+                                    )) : null}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -790,7 +808,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products.products?.map((product: any) => (
+                      {products?.map((product: any) => (
                         <TableRow key={product.id} data-testid={`product-row-${product.id}`}>
                           <TableCell>
                             <div className="flex items-center space-x-3">
