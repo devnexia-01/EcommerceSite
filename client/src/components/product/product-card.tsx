@@ -74,7 +74,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Allow guest checkout - no authentication required for buy now
+    // Check if product is in stock
     if (product.stock === 0) {
       toast({
         title: "Out of stock",
@@ -93,7 +93,22 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       // Redirect to buy now checkout
       navigate(data.redirectUrl);
-    } catch (error) {
+    } catch (error: any) {
+      // Handle authentication errors
+      if (error.status === 401 || error.status === 403) {
+        toast({
+          title: "Login Required",
+          description: "Please log in to use Buy Now. Redirecting to login...",
+          variant: "destructive"
+        });
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
+        return;
+      }
+      
+      // Handle other errors
       toast({
         title: "Error",
         description: "Failed to create purchase intent. Please try again.",

@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import { z } from 'zod';
 import { storage } from './storage';
+import { authenticateToken, type AuthenticatedRequest } from './auth-routes';
 
 // Validation schemas
 const createPurchaseIntentSchema = z.object({
@@ -21,14 +22,13 @@ const completePurchaseIntentSchema = z.object({
 
 export function setupBuyNowRoutes(app: Express) {
 
-  // Create buy now purchase intent
-  app.post('/api/buy-now/create-intent', async (req: Request, res: Response) => {
+  // Create buy now purchase intent - requires authentication
+  app.post('/api/buy-now/create-intent', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { productId, variantId, quantity, customization } = createPurchaseIntentSchema.parse(req.body);
 
-      // Get user ID from session or JWT
-      const userId = req.session?.userId; // For guest users, this will be undefined
-      const sessionId = req.sessionID; // Use session ID for guest purchases
+      // Get authenticated user ID
+      const userId = req.user!.userId;
 
       // Get product details and check availability
       const product = await storage.getProduct(productId);
@@ -52,7 +52,7 @@ export function setupBuyNowRoutes(app: Express) {
 
       const intent = await storage.createPurchaseIntent({
         userId,
-        sessionId: userId ? undefined : sessionId,
+        sessionId: undefined, // No session ID needed for authenticated users
         productId,
         variantId,
         quantity,
@@ -91,8 +91,8 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Get purchase intent details
-  app.get('/api/buy-now/intent/:intentId', async (req: Request, res: Response) => {
+  // Get purchase intent details - requires authentication
+  app.get('/api/buy-now/intent/:intentId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { intentId } = req.params;
       
@@ -103,6 +103,11 @@ export function setupBuyNowRoutes(app: Express) {
       const intent = await storage.getPurchaseIntent(intentId);
       if (!intent) {
         return res.status(404).json({ message: 'Purchase intent not found' });
+      }
+
+      // Verify ownership - user can only access their own purchase intents
+      if (intent.userId !== req.user!.userId) {
+        return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
       // Check if intent is expired
@@ -146,14 +151,19 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Complete purchase intent (convert to order)
-  app.post('/api/buy-now/complete', async (req: Request, res: Response) => {
+  // Complete purchase intent (convert to order) - requires authentication
+  app.post('/api/buy-now/complete', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { intentId } = completePurchaseIntentSchema.parse(req.body);
 
       const intent = await storage.getPurchaseIntent(intentId);
       if (!intent) {
         return res.status(404).json({ message: 'Purchase intent not found' });
+      }
+
+      // Verify ownership - user can only complete their own purchase intents
+      if (intent.userId !== req.user!.userId) {
+        return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
       // Check if intent is expired
@@ -225,14 +235,19 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Cancel purchase intent
-  app.post('/api/buy-now/cancel/:intentId', async (req: Request, res: Response) => {
+  // Cancel purchase intent - requires authentication
+  app.post('/api/buy-now/cancel/:intentId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { intentId } = req.params;
       
       const intent = await storage.getPurchaseIntent(intentId);
       if (!intent) {
         return res.status(404).json({ message: 'Purchase intent not found' });
+      }
+
+      // Verify ownership - user can only cancel their own purchase intents
+      if (intent.userId !== req.user!.userId) {
+        return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
       await storage.updatePurchaseIntentStatus(intentId, 'cancelled');
