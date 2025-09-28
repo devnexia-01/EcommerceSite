@@ -11,7 +11,10 @@ const isSMTPEnabled = !!(
 );
 
 const isSendGridEnabled = !!process.env.SENDGRID_API_KEY;
-const isEmailEnabled = isSMTPEnabled || isSendGridEnabled;
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Enable console email logging in development mode
+const isEmailEnabled = isSMTPEnabled || isSendGridEnabled || isDevelopment;
 
 let transporter: nodemailer.Transporter | null = null;
 let sendGridService: MailService | null = null;
@@ -32,6 +35,8 @@ if (isSendGridEnabled) {
     },
   });
   console.log("SMTP email service configured successfully");
+} else if (isDevelopment) {
+  console.log("Development mode: Email functionality enabled with console logging");
 } else {
   console.warn("Email configuration not found. Email functionality will be disabled.");
 }
@@ -289,11 +294,21 @@ export class EmailNotificationService {
         html: template.html,
       };
 
-      // Use SendGrid if available, otherwise fall back to SMTP
+      // Use SendGrid if available, otherwise fall back to SMTP, or console in development
       if (sendGridService) {
         await sendGridService.send(mailData);
       } else if (transporter) {
         await transporter.sendMail(mailData);
+      } else if (isDevelopment) {
+        // In development mode, log email to console
+        console.log('\n📧 === EMAIL NOTIFICATION (Development Mode) ===');
+        console.log('To:', mailData.to);
+        console.log('From:', mailData.from);
+        console.log('Subject:', mailData.subject);
+        console.log('Type:', type);
+        console.log('Text Content:');
+        console.log(mailData.text);
+        console.log('================================================\n');
       } else {
         throw new Error('No email service configured');
       }

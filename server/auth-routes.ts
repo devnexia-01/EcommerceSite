@@ -141,7 +141,7 @@ export function setupAuthRoutes(app: Express) {
       const accessToken = AuthUtils.generateAccessToken({
         userId: user.id,
         email: user.email,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin ?? false
       });
       
       const refreshTokenId = nanoid();
@@ -260,7 +260,7 @@ export function setupAuthRoutes(app: Express) {
       const accessToken = AuthUtils.generateAccessToken({
         userId: user.id,
         email: user.email,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin ?? false
       });
       
       const refreshTokenId = nanoid();
@@ -296,7 +296,7 @@ export function setupAuthRoutes(app: Express) {
           username: user.username,
           firstName: user.firstName,
           lastName: user.lastName,
-          isAdmin: user.isAdmin,
+          isAdmin: user.isAdmin ?? false,
           emailVerified: user.emailVerified,
           twoFactorEnabled: user.twoFactorEnabled
         },
@@ -372,7 +372,7 @@ export function setupAuthRoutes(app: Express) {
       const newAccessToken = AuthUtils.generateAccessToken({
         userId: user.id,
         email: user.email,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin ?? false
       });
       
       const newRefreshTokenId = nanoid();
@@ -458,8 +458,14 @@ export function setupAuthRoutes(app: Express) {
         expiresAt: AuthUtils.getPasswordResetExpiration()
       });
       
-      // TODO: Send password reset email
-      // await emailService.sendPasswordResetEmail(user.email, resetToken);
+      // Send password reset email
+      try {
+        const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.username;
+        await emailNotificationService.sendPasswordResetEmail(user.email, userName, resetToken);
+      } catch (emailError) {
+        console.error('Failed to send password reset email:', emailError);
+        // Don't fail the request if email fails - user security is more important
+      }
       
       res.json({ 
         message: 'If the email exists, a password reset link will be sent.',
