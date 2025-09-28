@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
@@ -130,12 +131,30 @@ export function setupAuthRoutes(app: Express) {
         pushNotifications: true
       });
       
-      // Generate email verification token
-      const verificationToken = AuthUtils.generateEmailVerificationToken();
-      await storage.setEmailVerificationToken(user.id, verificationToken);
+      // Generate and send OTP for email verification (using crypto-secure rejection sampling)
+      let otp: string;
+      do {
+        const randomBytes = crypto.randomBytes(4);
+        const randomNum = randomBytes.readUInt32BE(0);
+        const maxValidValue = Math.floor(0xFFFFFFFF / 900000) * 900000;
+        if (randomNum < maxValidValue) {
+          otp = ((randomNum % 900000) + 100000).toString();
+          break;
+        }
+      } while (true);
+      const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       
-      // TODO: Send verification email here
-      // await emailService.sendVerificationEmail(user.email, verificationToken);
+      // Store OTP
+      await storage.setUserOTP(user.id, otp, otpExpiresAt);
+      
+      // Send OTP email
+      try {
+        const displayName = user.firstName || user.username;
+        await emailNotificationService.sendOTPEmail(user.email, displayName, otp);
+      } catch (emailError) {
+        console.error('Failed to send verification OTP:', emailError);
+        // Don't fail registration if email fails
+      }
       
       // Generate tokens
       const accessToken = AuthUtils.generateAccessToken({
@@ -160,7 +179,7 @@ export function setupAuthRoutes(app: Express) {
       });
       
       res.status(201).json({
-        message: 'User registered successfully. Please verify your email.',
+        message: 'User registered successfully. Please check your email for a 6-digit verification code.',
         user: {
           id: user.id,
           email: user.email,

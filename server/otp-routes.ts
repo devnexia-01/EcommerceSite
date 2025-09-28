@@ -1,13 +1,21 @@
 import type { Express, Request, Response } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { storage } from './storage';
 import { emailNotificationService } from './email-service';
 import bcrypt from 'bcrypt';
 
-// Generate a random 6-digit OTP
+// Generate a cryptographically secure random 6-digit OTP using rejection sampling
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  while (true) {
+    const randomBytes = crypto.randomBytes(4);
+    const randomNum = randomBytes.readUInt32BE(0);
+    const maxValidValue = Math.floor(0xFFFFFFFF / 900000) * 900000;
+    if (randomNum < maxValidValue) {
+      return ((randomNum % 900000) + 100000).toString();
+    }
+  }
 }
 
 // Validation schemas
