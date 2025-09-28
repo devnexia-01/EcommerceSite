@@ -144,6 +144,7 @@ export interface IStorage {
   
   // Orders
   getOrders(userId?: string): Promise<(Order & { orderItems: (OrderItem & { product: Product })[] })[]>;
+  getOrdersBySession(sessionId: string): Promise<(Order & { orderItems: (OrderItem & { product: Product })[] })[]>;
   getOrder(id: string): Promise<(Order & { orderItems: (OrderItem & { product: Product })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: string, status: string): Promise<Order>;
@@ -754,6 +755,36 @@ export class DatabaseStorage implements IStorage {
       ? baseQuery.where(eq(orders.userId, userId))
       : baseQuery;
 
+    const results = await query.orderBy(desc(orders.createdAt));
+
+    // Group by order
+    const orderMap = new Map<string, Order & { orderItems: (OrderItem & { product: Product })[] }>();
+
+    results.forEach(result => {
+      const order = result.orders;
+      if (!orderMap.has(order.id)) {
+        orderMap.set(order.id, { ...order, orderItems: [] });
+      }
+
+      if (result.order_items && result.products) {
+        orderMap.get(order.id)!.orderItems.push({
+          ...result.order_items,
+          product: result.products
+        });
+      }
+    });
+
+    return Array.from(orderMap.values());
+  }
+
+  async getOrdersBySession(sessionId: string): Promise<(Order & { orderItems: (OrderItem & { product: Product })[] })[]> {
+    let baseQuery = db
+      .select()
+      .from(orders)
+      .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
+      .leftJoin(products, eq(orderItems.productId, products.id));
+
+    const query = baseQuery.where(eq(orders.sessionId, sessionId));
     const results = await query.orderBy(desc(orders.createdAt));
 
     // Group by order

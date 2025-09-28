@@ -180,12 +180,39 @@ export function setupBuyNowRoutes(app: Express) {
         });
       }
 
+      // Create the actual order
+      const totalPrice = parseFloat(intent.price) * intent.quantity;
+      
+      // Create order record
+      const orderData = {
+        userId: intent.userId || null, // Can be null for guest orders
+        sessionId: intent.sessionId || null,
+        status: 'pending', // Default status for new orders
+        total: totalPrice.toString(),
+        shippingAddress: 'Guest Order - Address to be provided', // Default for guest checkout
+        paymentMethod: 'online', // Default payment method
+        paymentStatus: 'pending'
+      };
+
+      // Create order items
+      const orderItems = [{
+        productId: intent.productId,
+        variantId: intent.variantId || null,
+        quantity: intent.quantity,
+        price: intent.price,
+        customization: intent.customization || null
+      }];
+
+      // Create the order in the database
+      const order = await storage.createOrder(orderData, orderItems);
+
       // Mark intent as completed
       await storage.updatePurchaseIntentStatus(intentId, 'completed');
 
       res.json({
         message: 'Purchase intent completed successfully',
         intentId: intent.id,
+        orderId: order.id,
         redirectUrl: '/orders' // Redirect to orders page after checkout
       });
 

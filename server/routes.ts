@@ -495,17 +495,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get orders for current user
-  app.get("/api/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  // Get orders for current user (supports both authenticated users and guest sessions)
+  app.get("/api/orders", async (req: Request, res: Response) => {
     try {
-      const userId = req.user?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Authentication required" });
+      // Check if user is authenticated via session
+      const userId = req.session?.userId;
+      
+      if (userId) {
+        // Authenticated user - get orders by userId
+        const orders = await storage.getOrders(userId);
+        return res.json(orders);
       }
       
-      const orders = await storage.getOrders(userId);
-      res.json(orders);
+      // Guest user - get orders by sessionId
+      const sessionId = req.sessionID;
+      if (sessionId) {
+        const orders = await storage.getOrdersBySession(sessionId);
+        return res.json(orders);
+      }
+      
+      // No session, return empty orders
+      res.json([]);
     } catch (error: any) {
+      console.error('Error fetching orders:', error);
       res.status(500).json({ message: error.message });
     }
   });

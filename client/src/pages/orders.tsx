@@ -52,21 +52,8 @@ export default function Orders() {
 
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
-    enabled: !!user,
+    // Always fetch orders - backend handles both authenticated and guest users
   });
-
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Please log in to view your orders</h1>
-          <Button onClick={() => setLocation('/login')} data-testid="button-login">
-            Log In
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -92,10 +79,22 @@ export default function Orders() {
           <CardContent>
             <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2" data-testid="text-no-orders">No orders yet</h3>
-            <p className="text-muted-foreground mb-6">You haven't placed any orders yet. Start shopping to see your orders here.</p>
-            <Button onClick={() => setLocation('/products')} data-testid="button-shop-now">
-              Start Shopping
-            </Button>
+            <p className="text-muted-foreground mb-6">
+              {user 
+                ? "You haven't placed any orders yet. Start shopping to see your orders here."
+                : "No orders found for your current session. You can still place orders as a guest, or log in to see your account orders."
+              }
+            </p>
+            <div className="space-x-4">
+              <Button onClick={() => setLocation('/products')} data-testid="button-shop-now">
+                Start Shopping
+              </Button>
+              {!user && (
+                <Button variant="outline" onClick={() => setLocation('/login')} data-testid="button-login">
+                  Log In
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
