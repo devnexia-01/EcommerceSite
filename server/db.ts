@@ -6,9 +6,11 @@ import * as schema from "@shared/schema";
 // Configure WebSocket for Neon
 neonConfig.webSocketConstructor = ws;
 
-// SSL verification is always enabled for security
-// If you need to use self-signed certificates in development,
-// use a proper CA or configure your database with valid certificates
+// For development, we need to handle SSL configuration more flexibly
+if (process.env.NODE_ENV === 'development') {
+  // Disable SSL verification for development environment to handle self-signed certificates
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -16,5 +18,8 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false
+});
 export const db = drizzle({ client: pool, schema });
