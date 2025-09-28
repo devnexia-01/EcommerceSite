@@ -1,12 +1,29 @@
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 import { storage } from './storage';
 
-const isEmailEnabled = !!process.env.SENDGRID_API_KEY;
+// Check if SMTP configuration is available
+const isEmailEnabled = !!(
+  process.env.SMTP_HOST && 
+  process.env.SMTP_PORT && 
+  process.env.SMTP_USER && 
+  process.env.SMTP_PASS
+);
+
+let transporter: nodemailer.Transporter | null = null;
 
 if (isEmailEnabled) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+  console.log("SMTP email service configured successfully");
 } else {
-  console.warn("SENDGRID_API_KEY not set. Email functionality will be disabled.");
+  console.warn("SMTP configuration not found. Email functionality will be disabled.");
 }
 
 export interface EmailTemplate {
@@ -196,7 +213,7 @@ export const emailTemplates = {
 };
 
 export class EmailNotificationService {
-  private fromEmail = 'noreply@yourstore.com'; // Replace with your verified sender email
+  private fromEmail = process.env.SMTP_FROM || 'noreply@yourstore.com';
 
   async sendNotification(
     type: keyof typeof emailTemplates,
@@ -205,8 +222,8 @@ export class EmailNotificationService {
     userPreferences?: any
   ): Promise<boolean> {
     try {
-      if (!isEmailEnabled) {
-        console.log(`Email notification ${type} skipped - SENDGRID_API_KEY not configured`);
+      if (!isEmailEnabled || !transporter) {
+        console.log(`Email notification ${type} skipped - SMTP not configured`);
         return true; // Not an error, email is just disabled
       }
 
@@ -221,15 +238,15 @@ export class EmailNotificationService {
 
       const template = emailTemplates[type](context);
       
-      const msg = {
-        to: userEmail,
+      const mailOptions = {
         from: this.fromEmail,
+        to: userEmail,
         subject: template.subject,
         text: template.text,
         html: template.html,
       };
 
-      await sgMail.send(msg);
+      await transporter.sendMail(mailOptions);
       console.log(`Email notification sent: ${type} to ${userEmail}`);
       return true;
     } catch (error) {
@@ -355,9 +372,13 @@ export class EmailNotificationService {
     }
 
     try {
-      const msg = {
+      if (!transporter) {
+        throw new Error('SMTP transporter not initialized');
+      }
+
+      const mailOptions = {
+        from: this.fromEmail,
         to: 'support@elitecommerce.com',
-        from: process.env.FROM_EMAIL || 'noreply@elitecommerce.com',
         replyTo: userEmail,
         subject: `Contact Form: ${subject}`,
         html: `
@@ -380,7 +401,7 @@ export class EmailNotificationService {
         text: `Contact Form Submission\nFrom: ${userName} (${userEmail})\n${phone ? `Phone: ${phone}\n` : ''}Category: ${category}\nSubject: ${subject}\n\nMessage:\n${message}`
       };
 
-      await sgMail.send(msg);
+      await transporter.sendMail(mailOptions);
     } catch (error) {
       console.error('Error sending contact form email:', error);
       throw error;
@@ -404,9 +425,13 @@ export class EmailNotificationService {
     }
 
     try {
-      const msg = {
+      if (!transporter) {
+        throw new Error('SMTP transporter not initialized');
+      }
+
+      const mailOptions = {
+        from: this.fromEmail,
         to: 'support@elitecommerce.com',
-        from: process.env.FROM_EMAIL || 'noreply@elitecommerce.com',
         replyTo: userEmail,
         subject: `[${priority.toUpperCase()}] Support Ticket #${ticketId}: ${subject}`,
         html: `
@@ -431,7 +456,7 @@ export class EmailNotificationService {
         text: `Support Ticket #${ticketId}\nPriority: ${priority.toUpperCase()}\nFrom: ${userName} (${userEmail})\nCategory: ${category}\n${orderNumber ? `Order: ${orderNumber}\n` : ''}Subject: ${subject}\n\nMessage:\n${message}`
       };
 
-      await sgMail.send(msg);
+      await transporter.sendMail(mailOptions);
     } catch (error) {
       console.error('Error sending support ticket email:', error);
       throw error;
@@ -446,9 +471,13 @@ export class EmailNotificationService {
     }
 
     try {
-      const msg = {
+      if (!transporter) {
+        throw new Error('SMTP transporter not initialized');
+      }
+
+      const mailOptions = {
+        from: this.fromEmail,
         to: userEmail,
-        from: process.env.FROM_EMAIL || 'noreply@elitecommerce.com',
         subject: 'Welcome to EliteCommerce Newsletter!',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -474,7 +503,7 @@ export class EmailNotificationService {
         text: `Welcome to EliteCommerce Newsletter!\n\nHi ${userName},\n\nThank you for subscribing! You'll receive exclusive deals, new product announcements, style tips, and special offers.\n\nHappy shopping!\nThe EliteCommerce Team`
       };
 
-      await sgMail.send(msg);
+      await transporter.sendMail(mailOptions);
     } catch (error) {
       console.error('Error sending newsletter welcome email:', error);
       throw error;
