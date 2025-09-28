@@ -28,6 +28,8 @@ import Returns from "./pages/returns";
 import Shipping from "./pages/shipping";
 import SizeGuide from "./pages/size-guide";
 import Orders from "./pages/orders";
+import ForgotPassword from "./pages/forgot-password";
+import ResetPassword from "./pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -44,6 +46,8 @@ function Router() {
       <Route path="/admin" component={Admin} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
       <Route path="/careers" component={Careers} />

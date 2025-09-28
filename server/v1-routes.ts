@@ -1001,7 +1001,6 @@ export function setupV1Routes(app: any, storage: any) {
           .where(eq(orders.id, orderId));
 
         await tx.insert(orderStatusHistory).values([{
-          id: nanoid(),
           orderId,
           toStatus: status,
           timestamp: new Date(),

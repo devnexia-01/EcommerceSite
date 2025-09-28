@@ -37,9 +37,9 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Check stock availability
-      if (product.stock < quantity) {
+      if (!product.stock || product.stock < quantity) {
         return res.status(400).json({ 
-          message: `Only ${product.stock} items available in stock`
+          message: `Only ${product.stock || 0} items available in stock`
         });
       }
 
@@ -57,7 +57,7 @@ export function setupBuyNowRoutes(app: Express) {
         variantId,
         quantity,
         price: price.toString(),
-        customization,
+        customization: customization || undefined,
         status: 'pending',
         expiresAt
       });
@@ -174,9 +174,9 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Check stock again before completing
-      if (product.stock < intent.quantity) {
+      if (!product.stock || product.stock < intent.quantity) {
         return res.status(400).json({ 
-          message: `Only ${product.stock} items available in stock`
+          message: `Only ${product.stock || 0} items available in stock`
         });
       }
 
