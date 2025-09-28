@@ -13,6 +13,8 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
+  verifyEmailOTP: (email: string, otp: string) => Promise<void>;
+  resendOTP: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -146,10 +148,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
   });
+  
+  const verifyEmailOTPMutation = useMutation({
+    mutationFn: ({ email, otp }: { email: string; otp: string }) => 
+      authApi.verifyEmailOTP(email, otp),
+    onSuccess: () => {
+      // Refresh user data to show verified status
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
+      toast({
+        title: "Success",
+        description: "Email verified successfully! You can now use all features."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Invalid or expired verification code",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const resendOTPMutation = useMutation({
+    mutationFn: authApi.resendOTP,
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "New verification code sent to your email"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend verification code",
+        variant: "destructive"
+      });
+    }
+  });
 
   const value: AuthContextType = {
     user: authData?.user || null,
-    isLoading: isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending,
+    isLoading: isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending || verifyEmailOTPMutation.isPending || resendOTPMutation.isPending,
     login: async (data: LoginData) => {
       await loginMutation.mutateAsync(data);
     },
@@ -168,6 +207,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     verifyEmail: async (token: string) => {
       await verifyEmailMutation.mutateAsync(token);
+    },
+    verifyEmailOTP: async (email: string, otp: string) => {
+      await verifyEmailOTPMutation.mutateAsync({ email, otp });
+    },
+    resendOTP: async (email: string) => {
+      await resendOTPMutation.mutateAsync(email);
     }
   };
 

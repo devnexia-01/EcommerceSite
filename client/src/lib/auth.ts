@@ -199,5 +199,35 @@ export const authApi = {
     }
     
     return response.json();
+  },
+  
+  verifyEmailOTP: async (email: string, otp: string): Promise<{ message: string }> => {
+    const response = await fetch('/api/auth/verify-email-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'OTP verification failed' }));
+      throw new Error(errorData.message || 'OTP verification failed');
+    }
+    
+    return response.json();
+  },
+  
+  resendOTP: async (email: string): Promise<{ message: string; expiresIn: number }> => {
+    const response = await fetch('/api/auth/resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to resend OTP' }));
+      throw new Error(errorData.message || 'Failed to resend OTP');
+    }
+    
+    return response.json();
   }
 };
