@@ -873,7 +873,6 @@ export function setupV1Routes(app: any, storage: any) {
 
         // Create initial status history
         await tx.insert(orderStatusHistory).values([{
-          id: nanoid(),
           orderId: newOrder.id,
           toStatus: orderData.status || "pending",
           timestamp: new Date(),
@@ -1061,7 +1060,6 @@ export function setupV1Routes(app: any, storage: any) {
           .where(eq(orders.id, orderId));
 
         await tx.insert(orderStatusHistory).values([{
-          id: nanoid(),
           orderId,
           toStatus: "cancelled",
           timestamp: new Date(),
