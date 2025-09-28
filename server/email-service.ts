@@ -1,17 +1,27 @@
 import nodemailer from 'nodemailer';
+import { MailService } from '@sendgrid/mail';
 import { storage } from './storage';
 
-// Check if SMTP configuration is available
-const isEmailEnabled = !!(
+// Check if email configuration is available (either SMTP or SendGrid)
+const isSMTPEnabled = !!(
   process.env.SMTP_HOST && 
   process.env.SMTP_PORT && 
   process.env.SMTP_USER && 
   process.env.SMTP_PASS
 );
 
-let transporter: nodemailer.Transporter | null = null;
+const isSendGridEnabled = !!process.env.SENDGRID_API_KEY;
+const isEmailEnabled = isSMTPEnabled || isSendGridEnabled;
 
-if (isEmailEnabled) {
+let transporter: nodemailer.Transporter | null = null;
+let sendGridService: MailService | null = null;
+
+// Configure email service
+if (isSendGridEnabled) {
+  sendGridService = new MailService();
+  sendGridService.setApiKey(process.env.SENDGRID_API_KEY!);
+  console.log("SendGrid email service configured successfully");
+} else if (isSMTPEnabled) {
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
@@ -23,7 +33,7 @@ if (isEmailEnabled) {
   });
   console.log("SMTP email service configured successfully");
 } else {
-  console.warn("SMTP configuration not found. Email functionality will be disabled.");
+  console.warn("Email configuration not found. Email functionality will be disabled.");
 }
 
 export interface EmailTemplate {
@@ -48,6 +58,8 @@ export interface NotificationContext {
   promotionCode?: string;
   otp?: string;
   verificationLink?: string;
+  resetLink?: string;
+  resetToken?: string;
 }
 
 // Email Templates
@@ -209,6 +221,37 @@ export const emailTemplates = {
       </div>
     `,
     text: `Confirm your subscription by visiting: ${context.verificationLink}. If you didn't subscribe, you can safely ignore this email.`
+  }),
+
+  passwordReset: (context: NotificationContext & { resetLink?: string, resetToken?: string }): EmailTemplate => ({
+    subject: 'Reset Your Password - EliteCommerce',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #dc3545;">Password Reset Request</h1>
+        <p>Hi ${context.userName},</p>
+        <p>We received a request to reset your password for your EliteCommerce account.</p>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <a href="${context.resetLink}" style="background: #dc3545; color: white; padding: 15px 30px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Reset Password</a>
+        </div>
+        
+        <p>If the button doesn't work, copy and paste this link in your browser:</p>
+        <p style="background: #f1f1f1; padding: 10px; border-radius: 4px; word-break: break-all;">${context.resetLink}</p>
+        
+        <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
+        <p>If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+        
+        <div style="border-top: 1px solid #dee2e6; margin-top: 30px; padding-top: 20px; color: #666; font-size: 12px;">
+          <p>For security reasons:</p>
+          <ul>
+            <li>Never share this reset link with anyone</li>
+            <li>The link can only be used once</li>
+            <li>If you continue to have problems, contact our support team</li>
+          </ul>
+        </div>
+      </div>
+    `,
+    text: `Password reset requested for your EliteCommerce account. Reset your password by visiting: ${context.resetLink}. This link expires in 1 hour. If you didn't request this reset, ignore this email.`
   })
 };
 
@@ -222,8 +265,8 @@ export class EmailNotificationService {
     userPreferences?: any
   ): Promise<boolean> {
     try {
-      if (!isEmailEnabled || !transporter) {
-        console.log(`Email notification ${type} skipped - SMTP not configured`);
+      if (!isEmailEnabled) {
+        console.log(`Email notification ${type} skipped - email service not configured`);
         return true; // Not an error, email is just disabled
       }
 
@@ -238,7 +281,7 @@ export class EmailNotificationService {
 
       const template = emailTemplates[type](context);
       
-      const mailOptions = {
+      const mailData = {
         from: this.fromEmail,
         to: userEmail,
         subject: template.subject,
@@ -246,7 +289,15 @@ export class EmailNotificationService {
         html: template.html,
       };
 
-      await transporter.sendMail(mailOptions);
+      // Use SendGrid if available, otherwise fall back to SMTP
+      if (sendGridService) {
+        await sendGridService.send(mailData);
+      } else if (transporter) {
+        await transporter.sendMail(mailData);
+      } else {
+        throw new Error('No email service configured');
+      }
+      
       console.log(`Email notification sent: ${type} to ${userEmail}`);
       return true;
     } catch (error) {
@@ -270,6 +321,8 @@ export class EmailNotificationService {
         return true; // Always send OTP emails for security
       case 'emailSubscriptionWelcome':
         return true; // Always send subscription confirmation
+      case 'passwordReset':
+        return true; // Always send password reset emails for security
       default:
         return true;
     }
@@ -545,6 +598,29 @@ export class EmailNotificationService {
       await this.sendNotification('emailSubscriptionWelcome', email, context);
     } catch (error) {
       console.error('Error sending subscription confirmation email:', error);
+      throw error;
+    }
+  }
+
+  // Send password reset email
+  async sendPasswordResetEmail(
+    userEmail: string,
+    userName: string,
+    resetToken: string
+  ): Promise<void> {
+    try {
+      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
+      
+      const context: NotificationContext & { resetLink: string; resetToken: string } = {
+        userName,
+        userEmail,
+        resetLink,
+        resetToken
+      };
+
+      await this.sendNotification('passwordReset', userEmail, context);
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
       throw error;
     }
   }
