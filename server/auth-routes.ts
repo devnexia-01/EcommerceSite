@@ -16,7 +16,7 @@ import {
 } from '@shared/schema';
 
 // Enhanced request interface with user data
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     userId: string;
     email: string;

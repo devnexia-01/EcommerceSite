@@ -817,13 +817,25 @@ export function setupV1Routes(app: any, storage: any) {
       const cleanedBody = {
         ...req.body,
         shippingAddress: {
-          ...req.body.shippingAddress,
+          firstName: req.body.shippingAddress?.firstName || '',
+          lastName: req.body.shippingAddress?.lastName || '',
+          streetAddress: req.body.shippingAddress?.streetAddress || '',
+          city: req.body.shippingAddress?.city || '',
+          state: req.body.shippingAddress?.state || '',
+          zipCode: req.body.shippingAddress?.zipCode || '',
+          country: req.body.shippingAddress?.country || '',
           company: typeof req.body.shippingAddress?.company === 'string' ? req.body.shippingAddress.company : undefined,
           streetAddress2: typeof req.body.shippingAddress?.streetAddress2 === 'string' ? req.body.shippingAddress.streetAddress2 : undefined,
           phone: typeof req.body.shippingAddress?.phone === 'string' ? req.body.shippingAddress.phone : undefined
         },
         billingAddress: {
-          ...req.body.billingAddress,
+          firstName: req.body.billingAddress?.firstName || '',
+          lastName: req.body.billingAddress?.lastName || '',
+          streetAddress: req.body.billingAddress?.streetAddress || '',
+          city: req.body.billingAddress?.city || '',
+          state: req.body.billingAddress?.state || '',
+          zipCode: req.body.billingAddress?.zipCode || '',
+          country: req.body.billingAddress?.country || '',
           company: typeof req.body.billingAddress?.company === 'string' ? req.body.billingAddress.company : undefined,
           streetAddress2: typeof req.body.billingAddress?.streetAddress2 === 'string' ? req.body.billingAddress.streetAddress2 : undefined,
           phone: typeof req.body.billingAddress?.phone === 'string' ? req.body.billingAddress.phone : undefined
@@ -831,9 +843,17 @@ export function setupV1Routes(app: any, storage: any) {
       };
 
       const orderData = insertOrderSchema.parse({
-        ...cleanedBody,
         userId,
-        orderNumber: generateOrderNumber()
+        orderNumber: generateOrderNumber(),
+        subtotal: cleanedBody.subtotal,
+        total: cleanedBody.total,
+        currency: cleanedBody.currency,
+        status: cleanedBody.status,
+        paymentMethod: cleanedBody.paymentMethod,
+        paymentStatus: cleanedBody.paymentStatus,
+        notes: cleanedBody.notes,
+        shippingAddress: cleanedBody.shippingAddress,
+        billingAddress: cleanedBody.billingAddress
       });
 
       // Start transaction for order creation
@@ -1091,9 +1111,67 @@ export function setupV1Routes(app: any, storage: any) {
     });
   }
 
-  // POST /api/v1/create-razorpay-order - Server-calculated amount from cart
+  // POST /api/v1/create-razorpay-order - Server-calculated amount from cart (supports COD)
   app.post("/api/v1/create-razorpay-order", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      // Check if this is a COD payment
+      const paymentMethod = req.body.paymentMethod || "razorpay";
+      
+      if (paymentMethod === "cod") {
+        // Handle COD payment - bypass Razorpay entirely
+        const userId = req.user?.userId;
+        if (!userId) {
+          return res.status(401).json({ 
+            success: false, 
+            error: "Authentication required" 
+          });
+        }
+
+        // Get cart items from server to calculate amount securely
+        const userCart = await storage.getCartByUser(userId);
+        if (!userCart || !userCart.items.length) {
+          return res.status(400).json({
+            success: false,
+            error: "Cart is empty"
+          });
+        }
+
+        // Calculate server-side amount for COD
+        let subtotal = 0;
+        for (const item of userCart.items) {
+          const product = await storage.getProductById(item.productId);
+          if (product) {
+            subtotal += parseFloat(product.price) * item.quantity;
+          }
+        }
+
+        const shippingMethod = req.body.shippingMethod || "standard";
+        const shipping = shippingMethod === "express" ? 15.00 : 
+                       shippingMethod === "overnight" ? 30.00 : 
+                       subtotal > 40 ? 0 : 8.00;
+        
+        const tax = subtotal * 0.18; // 18% GST for India
+        const total = subtotal + shipping + tax;
+        
+        // Return COD order details without Razorpay
+        return res.json({
+          success: true,
+          order: {
+            id: `cod_${Date.now()}_${userId}`,
+            amount: Math.round(total * 100), // Amount in paise
+            currency: "INR",
+            receipt: `cod_order_${Date.now()}_${userId}`,
+            payment_method: "cod",
+            status: "created"
+          },
+          subtotal: subtotal.toFixed(2),
+          shipping: shipping.toFixed(2),
+          tax: tax.toFixed(2),
+          total: total.toFixed(2)
+        });
+      }
+
+      // For non-COD payments, check Razorpay configuration
       if (!razorpay) {
         return res.status(500).json({
           success: false,
