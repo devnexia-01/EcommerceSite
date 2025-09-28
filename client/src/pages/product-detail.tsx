@@ -103,13 +103,7 @@ export default function ProductDetail() {
   };
 
   const handleBuyNow = async () => {
-    // Redirect to login if not authenticated
-    if (!isAuthenticated) {
-      const fullPath = window.location.pathname + window.location.search + window.location.hash;
-      navigate(`/login?redirect=${encodeURIComponent(fullPath)}`);
-      return;
-    }
-
+    // Allow guest checkout - no authentication required for buy now
     if (product.stock === 0) {
       toast({
         title: "Out of stock",
@@ -124,9 +118,10 @@ export default function ProductDetail() {
         productId: product.id,
         quantity
       });
+      const data = await response.json();
 
       // Redirect to buy now checkout
-      navigate(response.redirectUrl);
+      navigate(data.redirectUrl);
     } catch (error) {
       toast({
         title: "Error",

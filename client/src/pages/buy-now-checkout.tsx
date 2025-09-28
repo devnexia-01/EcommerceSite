@@ -22,18 +22,15 @@ export default function BuyNowCheckout() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      const fullPath = window.location.pathname + window.location.search + window.location.hash;
-      navigate(`/login?redirect=${encodeURIComponent(fullPath)}`);
-    }
-  }, [isAuthenticated, navigate]);
+  // Allow guest checkout - no authentication required for buy now
 
   const { data: purchaseData, isLoading, error } = useQuery({
     queryKey: ["/api/buy-now/intent", params?.intentId],
-    queryFn: () => apiRequest("GET", `/api/buy-now/intent/${params?.intentId}`),
-    enabled: !!params?.intentId && isAuthenticated,
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/buy-now/intent/${params?.intentId}`);
+      return await response.json();
+    },
+    enabled: !!params?.intentId,
     retry: false
   });
 
@@ -136,7 +133,7 @@ export default function BuyNowCheckout() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(-1)}
+            onClick={() => window.history.back()}
             data-testid="back-button"
           >
             <ArrowLeft className="h-4 w-4" />
