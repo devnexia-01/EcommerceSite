@@ -1,13 +1,5 @@
 import { Request, Response } from "express";
-
-// Extend Request type to include user
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    isAdmin: boolean;
-  };
-}
+import { AuthenticatedRequest } from "./auth-routes";
 import { db } from "./db";
 import { 
   paymentMethods, 
@@ -104,7 +96,7 @@ const stripeService = new MockStripeService();
 export async function processPayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { orderId, paymentMethodId, amount, currency = "USD" } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -208,7 +200,7 @@ export async function processPayment(req: AuthenticatedRequest, res: Response) {
 export async function authorizePayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { orderId, paymentMethodId, amount, currency = "USD" } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -293,7 +285,7 @@ export async function capturePayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId } = req.params;
     const { amount } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -366,7 +358,7 @@ export async function capturePayment(req: AuthenticatedRequest, res: Response) {
 export async function refundPayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId, amount, reason = "requested_by_customer" } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -459,7 +451,7 @@ export async function refundPayment(req: AuthenticatedRequest, res: Response) {
 export async function getTransaction(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -497,7 +489,7 @@ export async function createPaymentMethod(req: AuthenticatedRequest, res: Respon
       billingAddress, 
       isDefault = false 
     } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -568,7 +560,7 @@ export async function createPaymentMethod(req: AuthenticatedRequest, res: Respon
 export async function getUserPaymentMethods(req: AuthenticatedRequest, res: Response) {
   try {
     const { userId: requestedUserId } = req.params;
-    const currentUserId = req.user?.id;
+    const currentUserId = req.user?.userId;
 
     if (!currentUserId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -613,7 +605,7 @@ export async function getUserPaymentMethods(req: AuthenticatedRequest, res: Resp
 export async function deletePaymentMethod(req: AuthenticatedRequest, res: Response) {
   try {
     const { methodId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -669,7 +661,7 @@ export async function deletePaymentMethod(req: AuthenticatedRequest, res: Respon
 export async function process3DSecure(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId, returnUrl } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -732,7 +724,7 @@ export async function processApplePay(req: AuthenticatedRequest, res: Response) 
       billingContact, 
       shippingContact 
     } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -854,7 +846,7 @@ export async function processGooglePay(req: AuthenticatedRequest, res: Response)
       billingContact, 
       shippingContact 
     } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -974,7 +966,7 @@ export async function processGooglePay(req: AuthenticatedRequest, res: Response)
 export async function processCODPayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { orderId, amount, currency = "USD", deliveryAddress } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -1052,7 +1044,7 @@ export async function processCODPayment(req: AuthenticatedRequest, res: Response
 export async function confirmCODPayment(req: AuthenticatedRequest, res: Response) {
   try {
     const { transactionId, deliveredBy } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
