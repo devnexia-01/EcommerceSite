@@ -246,22 +246,29 @@ export function setupBuyNowRoutes(app: Express) {
       const orderNumber = `ORD-${timestamp.slice(-6)}${random}`;
       
       // Validate shipping address is present
-      if (!intent.shippingAddress) {
+      if (!intent.shippingAddress || !intent.email || !intent.phone) {
         return res.status(400).json({ 
-          message: 'Shipping address is required. Please provide shipping details before completing the order.'
+          message: 'Shipping address, email, and phone are required. Please provide shipping details before completing the order.'
         });
       }
 
+      // Use the structured shipping address directly
+      const shippingAddressObj = intent.shippingAddress;
+      
+      // Use shipping address as billing address for buy-now orders
+      const billingAddressObj = { ...shippingAddressObj };
+
       // Create order record
       const orderData = {
-        userId: intent.userId || null, // Can be null for guest orders
+        userId: intent.userId || null,
         sessionId: intent.sessionId || null,
         orderNumber: orderNumber,
-        status: 'pending', // Default status for new orders
+        status: 'pending',
         subtotal: subtotal.toFixed(2),
         shipping: shippingCost.toFixed(2),
         total: totalPrice.toFixed(2),
-        shippingAddress: intent.shippingAddress,
+        shippingAddress: shippingAddressObj,
+        billingAddress: billingAddressObj,
         paymentMethod: paymentMethod || 'online',
         paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending'
       };

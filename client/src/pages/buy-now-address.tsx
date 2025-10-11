@@ -92,7 +92,21 @@ export default function BuyNowAddress() {
     setIsSubmitting(true);
 
     try {
-      const shippingAddress = `${formData.fullName}, ${formData.addressLine1}${formData.addressLine2 ? ', ' + formData.addressLine2 : ''}, ${formData.city}, ${formData.state} ${formData.zipCode}, ${formData.country}`;
+      const nameParts = formData.fullName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || firstName;
+
+      const shippingAddress = {
+        firstName,
+        lastName,
+        streetAddress: formData.addressLine1,
+        streetAddress2: formData.addressLine2 || undefined,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        country: formData.country,
+        phone: formData.phone
+      };
       
       await apiRequest("POST", `/api/buy-now/intent/${params?.intentId}/address`, {
         shippingAddress,

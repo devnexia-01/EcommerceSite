@@ -2165,7 +2165,17 @@ export const purchaseIntents = pgTable("purchase_intents", {
     giftMessage?: string;
     [key: string]: any;
   }>(),
-  shippingAddress: text("shipping_address"),
+  shippingAddress: jsonb("shipping_address").$type<{
+    firstName: string;
+    lastName: string;
+    streetAddress: string;
+    streetAddress2?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    phone: string;
+  }>(),
   email: text("email"),
   phone: text("phone"),
   status: text("status").default("pending"), // pending, completed, expired, cancelled
