@@ -193,10 +193,16 @@ export function setupBuyNowRoutes(app: Express) {
       // Create the actual order
       const totalPrice = parseFloat(intent.price) * intent.quantity;
       
+      // Generate order number
+      const timestamp = Date.now().toString();
+      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const orderNumber = `ORD-${timestamp.slice(-6)}${random}`;
+      
       // Create order record
       const orderData = {
         userId: intent.userId || null, // Can be null for guest orders
         sessionId: intent.sessionId || null,
+        orderNumber: orderNumber,
         status: 'pending', // Default status for new orders
         total: totalPrice.toString(),
         shippingAddress: 'Guest Order - Address to be provided', // Default for guest checkout
