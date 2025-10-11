@@ -26,11 +26,12 @@ interface Order {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   total: string;
   createdAt: string;
-  items: OrderItem[];
+  orderItems: OrderItem[];
   shippingAddress: {
-    fullName: string;
-    addressLine1: string;
-    addressLine2?: string;
+    firstName: string;
+    lastName: string;
+    streetAddress: string;
+    streetAddress2?: string;
     city: string;
     state: string;
     zipCode: string;
@@ -99,7 +100,7 @@ export default function Orders() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {orders.map((order) => (
+          {orders?.map((order) => (
             <Card key={order.id} className="overflow-hidden" data-testid={`card-order-${order.id}`}>
               <CardHeader className="bg-muted/50">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -134,7 +135,7 @@ export default function Orders() {
                 <div className="space-y-4">
                   {/* Order Items */}
                   <div className="space-y-3">
-                    {order.items.map((item) => (
+                    {order.orderItems?.map((item) => (
                       <div key={item.id} className="flex items-center gap-4" data-testid={`item-${item.id}`}>
                         <img
                           src={item.product.imageUrl}
@@ -172,10 +173,10 @@ export default function Orders() {
                       Shipping Address
                     </div>
                     <div className="text-sm text-muted-foreground pl-6" data-testid={`text-shipping-address-${order.id}`}>
-                      <div>{order.shippingAddress.fullName}</div>
-                      <div>{order.shippingAddress.addressLine1}</div>
-                      {order.shippingAddress.addressLine2 && (
-                        <div>{order.shippingAddress.addressLine2}</div>
+                      <div>{order.shippingAddress.firstName} {order.shippingAddress.lastName}</div>
+                      <div>{order.shippingAddress.streetAddress}</div>
+                      {order.shippingAddress.streetAddress2 && (
+                        <div>{order.shippingAddress.streetAddress2}</div>
                       )}
                       <div>
                         {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
