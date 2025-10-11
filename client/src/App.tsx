@@ -28,6 +28,7 @@ import Returns from "./pages/returns";
 import Shipping from "./pages/shipping";
 import SizeGuide from "./pages/size-guide";
 import Orders from "./pages/orders";
+import OrderConfirmation from "./pages/order-confirmation";
 import ForgotPassword from "./pages/forgot-password";
 import ResetPassword from "./pages/reset-password";
 import NotFound from "@/pages/not-found";
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/shipping" component={Shipping} />
       <Route path="/size-guide" component={SizeGuide} />
       <Route path="/orders" component={Orders} />
+      <Route path="/order-confirmation/:orderId" component={OrderConfirmation} />
       <Route component={NotFound} />
     </Switch>
   );
