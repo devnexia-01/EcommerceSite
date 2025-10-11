@@ -272,10 +272,20 @@ export default function Admin() {
   }
 
   const onSubmitProduct = async (data: any) => {
+    const slug = data.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    const productData = {
+      ...data,
+      slug,
+    };
+
     if (editingProduct) {
-      await updateProductMutation.mutateAsync({ id: editingProduct.id, data });
+      await updateProductMutation.mutateAsync({ id: editingProduct.id, data: productData });
     } else {
-      await createProductMutation.mutateAsync(data);
+      await createProductMutation.mutateAsync(productData);
     }
   };
 
