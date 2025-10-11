@@ -1,13 +1,27 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Package, Truck, CreditCard, MapPin, ArrowLeft, Calendar, LogIn } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Package, Truck, CreditCard, MapPin, ArrowLeft, Calendar, LogIn, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
@@ -22,10 +36,41 @@ export default function OrderDetails() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const orderId = params?.orderId;
+  const { toast } = useToast();
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const { data: orderData, isLoading, error } = useQuery<any>({
     queryKey: ['/api/v1/orders', orderId],
     enabled: !!orderId && !!user
+  });
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/v1/orders/${orderId}/cancel`, {
+        reason: cancelReason || "Customer requested cancellation",
+        notes: cancelReason
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/orders', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/v1/admin/orders'] });
+      toast({
+        title: "Order cancelled successfully",
+        description: "Your order has been cancelled.",
+      });
+      setShowCancelDialog(false);
+      setCancelReason("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to cancel order",
+        description: error?.message || "There was an error cancelling your order. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -339,7 +384,58 @@ export default function OrderDetails() {
               Reorder
             </Button>
           )}
+          {(order.status === 'pending' || order.status === 'processing') && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setShowCancelDialog(true)}
+              data-testid="button-cancel-order"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancel Order
+            </Button>
+          )}
         </div>
+
+        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <AlertDialogContent data-testid="dialog-cancel-order">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel Order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to cancel this order? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Label htmlFor="cancel-reason" className="text-sm font-medium">
+                Reason for cancellation (optional)
+              </Label>
+              <Textarea
+                id="cancel-reason"
+                placeholder="Please tell us why you're cancelling this order..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="mt-2"
+                rows={4}
+                data-testid="textarea-cancel-reason"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-dialog-close">
+                Keep Order
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  cancelOrderMutation.mutate();
+                }}
+                disabled={cancelOrderMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-cancel"
+              >
+                {cancelOrderMutation.isPending ? "Cancelling..." : "Cancel Order"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
