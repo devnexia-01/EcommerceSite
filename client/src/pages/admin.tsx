@@ -39,7 +39,7 @@ export default function Admin() {
   const queryClient = useQueryClient();
 
   const productForm = useForm({
-    resolver: zodResolver(insertProductSchema),
+    resolver: zodResolver(insertProductSchema.omit({ slug: true })),
     defaultValues: {
       name: "",
       description: "",
@@ -272,6 +272,9 @@ export default function Admin() {
   }
 
   const onSubmitProduct = async (data: any) => {
+    console.log('Form data:', data);
+    console.log('Form errors:', productForm.formState.errors);
+    
     const slug = data.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -281,6 +284,8 @@ export default function Admin() {
       ...data,
       slug,
     };
+
+    console.log('Product data to submit:', productData);
 
     if (editingProduct) {
       await updateProductMutation.mutateAsync({ id: editingProduct.id, data: productData });
