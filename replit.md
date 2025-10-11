@@ -11,15 +11,16 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### October 11, 2025 - Cancel Order Feature Implementation
-- **Feature Added**: Users can now cancel their pending or processing orders directly from the order details page
+- **Feature Added**: Users can now cancel their orders directly from the order details page (for cancellable order statuses)
 - **Changes Made**:
-  - Added cancel order button with XCircle icon that appears only for orders with "pending" or "processing" status
+  - Added cancel order button with XCircle icon that appears for all cancellable order statuses (pending, confirmed, processing)
+  - Button is hidden for non-cancellable statuses (shipped, delivered, cancelled, returned, refunded) to match backend validation
   - Implemented confirmation dialog with optional cancellation reason textarea
   - Integrated with existing backend API endpoint `/api/v1/orders/:orderId/cancel`
   - Added comprehensive cache invalidation to refresh all order-related queries (user orders, admin orders, order details)
   - Implemented proper error handling with toast notifications for success and failure states
   - Added loading state to prevent duplicate cancellation requests
-- **User Flow**: When viewing a pending/processing order, users see a "Cancel Order" button. Clicking it opens a dialog where they can optionally provide a reason. Upon confirmation, the order is cancelled, the backend updates the order status, and all relevant UI views are refreshed to show the cancelled status.
+- **User Flow**: When viewing a cancellable order (pending, confirmed, or processing), users see a "Cancel Order" button. Clicking it opens a dialog where they can optionally provide a reason. Upon confirmation, the order is cancelled, the backend updates the order status, and all relevant UI views are refreshed to show the cancelled status.
 
 ### October 11, 2025 - Order Details Page Implementation
 - **Issue Fixed**: Missing order details page causing 404 errors when users clicked "View Details" from orders list

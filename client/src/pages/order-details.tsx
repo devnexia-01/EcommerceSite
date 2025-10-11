@@ -384,7 +384,7 @@ export default function OrderDetails() {
               Reorder
             </Button>
           )}
-          {(order.status === 'pending' || order.status === 'processing') && (
+          {!['shipped', 'delivered', 'cancelled', 'returned', 'refunded'].includes(order.status) && (
             <Button 
               variant="destructive" 
               onClick={() => setShowCancelDialog(true)}
