@@ -164,7 +164,7 @@ export default function Checkout() {
       
       // Process COD payment
       const codResponse = await apiRequest("POST", "/api/v1/payments/cod", {
-        orderId: order.id,
+        orderId: order.data.id,
         amount: orderData.total,
         currency: "INR",
         deliveryAddress: orderData.shippingAddress
@@ -174,7 +174,7 @@ export default function Checkout() {
       
       if (codResult.status === "confirmed") {
         clearCart();
-        navigate(`/order-confirmation/${order.id}`);
+        navigate(`/order-confirmation/${order.data.id}`);
         toast({
           title: "Order confirmed!",
           description: codResult.message
