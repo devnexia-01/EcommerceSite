@@ -17,7 +17,8 @@ const createPurchaseIntentSchema = z.object({
 });
 
 const completePurchaseIntentSchema = z.object({
-  intentId: z.string().uuid("Invalid intent ID")
+  intentId: z.string().uuid("Invalid intent ID"),
+  paymentMethod: z.enum(["online", "cod"]).optional().default("online")
 });
 
 export function setupBuyNowRoutes(app: Express) {
@@ -72,7 +73,7 @@ export function setupBuyNowRoutes(app: Express) {
           expiresAt: intent.expiresAt,
           customization: intent.customization
         },
-        redirectUrl: `/checkout/buy-now/${intent.id}`,
+        redirectUrl: `/checkout/buy-now/${intent.id}/address`,
         product: {
           id: product.id,
           name: product.name,
@@ -151,10 +152,54 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
+  // Save shipping address to purchase intent - requires authentication
+  app.post('/api/buy-now/intent/:intentId/address', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { intentId } = req.params;
+      const { shippingAddress, email, phone } = req.body;
+
+      if (!intentId) {
+        return res.status(400).json({ message: 'Intent ID is required' });
+      }
+
+      if (!shippingAddress) {
+        return res.status(400).json({ message: 'Shipping address is required' });
+      }
+
+      const intent = await storage.getPurchaseIntent(intentId);
+      if (!intent) {
+        return res.status(404).json({ message: 'Purchase intent not found' });
+      }
+
+      // Verify ownership - user can only update their own purchase intents
+      if (intent.userId !== req.user!.userId) {
+        return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
+      }
+
+      // Check if intent is expired
+      if (intent.expiresAt < new Date()) {
+        await storage.updatePurchaseIntentStatus(intentId, 'expired');
+        return res.status(410).json({ message: 'Purchase intent has expired' });
+      }
+
+      // Update the purchase intent with shipping address
+      await storage.updatePurchaseIntentAddress(intentId, shippingAddress, email, phone);
+
+      res.json({ 
+        message: 'Shipping address saved successfully',
+        intentId 
+      });
+
+    } catch (error) {
+      console.error('Save address error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Complete purchase intent (convert to order) - requires authentication
   app.post('/api/buy-now/complete', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { intentId } = completePurchaseIntentSchema.parse(req.body);
+      const { intentId, paymentMethod } = completePurchaseIntentSchema.parse(req.body);
 
       const intent = await storage.getPurchaseIntent(intentId);
       if (!intent) {
@@ -198,6 +243,13 @@ export function setupBuyNowRoutes(app: Express) {
       const random = Math.random().toString(36).substring(2, 8).toUpperCase();
       const orderNumber = `ORD-${timestamp.slice(-6)}${random}`;
       
+      // Validate shipping address is present
+      if (!intent.shippingAddress) {
+        return res.status(400).json({ 
+          message: 'Shipping address is required. Please provide shipping details before completing the order.'
+        });
+      }
+
       // Create order record
       const orderData = {
         userId: intent.userId || null, // Can be null for guest orders
@@ -205,9 +257,9 @@ export function setupBuyNowRoutes(app: Express) {
         orderNumber: orderNumber,
         status: 'pending', // Default status for new orders
         total: totalPrice.toString(),
-        shippingAddress: 'Guest Order - Address to be provided', // Default for guest checkout
-        paymentMethod: 'online', // Default payment method
-        paymentStatus: 'pending'
+        shippingAddress: intent.shippingAddress,
+        paymentMethod: paymentMethod || 'online',
+        paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending'
       };
 
       // Create order items

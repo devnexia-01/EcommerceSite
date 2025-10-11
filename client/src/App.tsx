@@ -15,6 +15,7 @@ import ProductDetail from "./pages/product-detail";
 import Cart from "./pages/cart";
 import Checkout from "./pages/checkout";
 import BuyNowCheckout from "./pages/buy-now-checkout";
+import BuyNowAddress from "./pages/buy-now-address";
 import Profile from "./pages/profile";
 import Admin from "./pages/admin";
 import Login from "./pages/login";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/product/:slug" component={ProductDetail} />
       <Route path="/cart" component={Cart} />
       <Route path="/checkout" component={Checkout} />
+      <Route path="/checkout/buy-now/:intentId/address" component={BuyNowAddress} />
       <Route path="/checkout/buy-now/:intentId" component={BuyNowCheckout} />
       <Route path="/profile" component={Profile} />
       <Route path="/admin" component={Admin} />

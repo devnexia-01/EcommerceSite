@@ -88,6 +88,7 @@ export interface IStorage {
   createPurchaseIntent(intent: any): Promise<any>;
   getPurchaseIntent(id: string): Promise<any>;
   updatePurchaseIntentStatus(id: string, status: string): Promise<any>;
+  updatePurchaseIntentAddress(id: string, shippingAddress: string, email: string, phone: string): Promise<any>;
   cleanupExpiredPurchaseIntents(): Promise<void>;
   
   // Login Sessions
@@ -1642,6 +1643,19 @@ export class DatabaseStorage implements IStorage {
   async updatePurchaseIntentStatus(id: string, status: string): Promise<PurchaseIntent | undefined> {
     const [intent] = await db.update(purchaseIntents)
       .set({ status })
+      .where(eq(purchaseIntents.id, id))
+      .returning();
+
+    return intent;
+  }
+
+  async updatePurchaseIntentAddress(id: string, shippingAddress: string, email: string, phone: string): Promise<PurchaseIntent | undefined> {
+    const [intent] = await db.update(purchaseIntents)
+      .set({ 
+        shippingAddress,
+        email,
+        phone
+      })
       .where(eq(purchaseIntents.id, id))
       .returning();
 

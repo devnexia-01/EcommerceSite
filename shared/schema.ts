@@ -2165,6 +2165,9 @@ export const purchaseIntents = pgTable("purchase_intents", {
     giftMessage?: string;
     [key: string]: any;
   }>(),
+  shippingAddress: text("shipping_address"),
+  email: text("email"),
+  phone: text("phone"),
   status: text("status").default("pending"), // pending, completed, expired, cancelled
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").default(sql`now()`)
