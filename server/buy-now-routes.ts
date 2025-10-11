@@ -238,7 +238,7 @@ export function setupBuyNowRoutes(app: Express) {
       // Create the actual order
       const subtotal = parseFloat(intent.price) * intent.quantity;
       const shippingCost = subtotal >= 50 ? 0 : 9.99;
-      const totalPrice = subtotal + shippingCost;
+      const orderTotal = subtotal + shippingCost;
       
       // Generate order number
       const timestamp = Date.now().toString();
@@ -258,27 +258,35 @@ export function setupBuyNowRoutes(app: Express) {
       // Use shipping address as billing address for buy-now orders
       const billingAddressObj = { ...shippingAddressObj };
 
-      // Create order record
+      // Create order record - use authenticated user ID since this is a protected endpoint
       const orderData = {
-        userId: intent.userId || null,
-        sessionId: intent.sessionId || null,
+        userId: req.user!.userId,
         orderNumber: orderNumber,
         status: 'pending',
         subtotal: subtotal.toFixed(2),
         shipping: shippingCost.toFixed(2),
-        total: totalPrice.toFixed(2),
+        total: orderTotal.toFixed(2),
         shippingAddress: shippingAddressObj,
         billingAddress: billingAddressObj,
         paymentMethod: paymentMethod || 'online',
         paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending'
       };
 
-      // Create order items
+      // Create order items with all required fields (product already fetched above)
+      const unitPrice = parseFloat(intent.price.toString());
+      const itemTotal = unitPrice * intent.quantity;
+      
       const orderItems = [{
         productId: intent.productId,
         variantId: intent.variantId || null,
+        sku: product.sku || `SKU-${Date.now()}-${intent.productId.slice(-8)}`,
+        name: product.name || 'Product',
+        description: product.description || null,
         quantity: intent.quantity,
-        price: intent.price,
+        unitPrice: unitPrice.toFixed(2),
+        totalPrice: itemTotal.toFixed(2),
+        price: unitPrice.toFixed(2),
+        total: itemTotal.toFixed(2),
         customization: intent.customization || null
       }];
 
