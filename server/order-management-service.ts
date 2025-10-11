@@ -359,7 +359,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       }
 
       // Check if order can be cancelled
-      if (!["pending", "confirmed"].includes(order.status)) {
+      if (!order.status || !["pending", "confirmed"].includes(order.status)) {
         return res.status(400).json({ error: "Order cannot be cancelled in current status" });
       }
 
@@ -414,7 +414,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       }
 
       // Check if order is eligible for return
-      if (!["delivered"].includes(order.status)) {
+      if (!order.status || !["delivered"].includes(order.status)) {
         return res.status(400).json({ error: "Order is not eligible for return" });
       }
 

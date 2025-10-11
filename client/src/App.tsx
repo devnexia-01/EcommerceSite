@@ -29,6 +29,7 @@ import Returns from "./pages/returns";
 import Shipping from "./pages/shipping";
 import SizeGuide from "./pages/size-guide";
 import Orders from "./pages/orders";
+import OrderDetails from "./pages/order-details";
 import OrderConfirmation from "./pages/order-confirmation";
 import ForgotPassword from "./pages/forgot-password";
 import ResetPassword from "./pages/reset-password";
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/shipping" component={Shipping} />
       <Route path="/size-guide" component={SizeGuide} />
       <Route path="/orders" component={Orders} />
+      <Route path="/orders/:orderId" component={OrderDetails} />
       <Route path="/order-confirmation/:orderId" component={OrderConfirmation} />
       <Route component={NotFound} />
     </Switch>
