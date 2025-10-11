@@ -236,7 +236,9 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Create the actual order
-      const totalPrice = parseFloat(intent.price) * intent.quantity;
+      const subtotal = parseFloat(intent.price) * intent.quantity;
+      const shippingCost = subtotal >= 50 ? 0 : 9.99;
+      const totalPrice = subtotal + shippingCost;
       
       // Generate order number
       const timestamp = Date.now().toString();
@@ -256,7 +258,9 @@ export function setupBuyNowRoutes(app: Express) {
         sessionId: intent.sessionId || null,
         orderNumber: orderNumber,
         status: 'pending', // Default status for new orders
-        total: totalPrice.toString(),
+        subtotal: subtotal.toFixed(2),
+        shipping: shippingCost.toFixed(2),
+        total: totalPrice.toFixed(2),
         shippingAddress: intent.shippingAddress,
         paymentMethod: paymentMethod || 'online',
         paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending'
