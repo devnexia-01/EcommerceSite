@@ -626,6 +626,48 @@ export function setupAdminRoutes(app: Express) {
     }
   });
 
+  // ============= ORDER MANAGEMENT =============
+  
+  // GET /api/v1/admin/orders
+  app.get('/api/v1/admin/orders', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { 
+        search, 
+        status, 
+        sortBy = 'createdAt', 
+        sortOrder = 'desc', 
+        limit = '50', 
+        offset = '0' 
+      } = req.query;
+
+      const result = await adminStorage.getAllOrders({
+        search: search as string,
+        status: status as string,
+        sortBy: sortBy as string,
+        sortOrder: sortOrder as 'asc' | 'desc',
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string)
+      });
+
+      res.json({
+        success: true,
+        data: result.orders,
+        meta: {
+          total: result.total,
+          page: Math.floor(parseInt(offset as string) / parseInt(limit as string)) + 1,
+          limit: parseInt(limit as string),
+          totalPages: Math.ceil(result.total / parseInt(limit as string))
+        }
+      });
+    } catch (error: any) {
+      console.error('Get orders error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch orders' 
+      });
+    }
+  });
+
   // ============= ROLES & PERMISSIONS =============
   
   // GET /api/v1/admin/roles

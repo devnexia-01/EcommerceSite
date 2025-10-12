@@ -318,43 +318,6 @@ export function setupUserRoutes(app: Express) {
     }
   });
   
-  // Admin-only routes
-  
-  // GET /api/v1/admin/users - List all users (admin only)
-  app.get('/api/v1/admin/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-    try {
-      const { 
-        page = '1', 
-        limit = '20', 
-        search, 
-        status 
-      } = req.query as Record<string, string>;
-      
-      const pageNum = parseInt(page);
-      const limitNum = parseInt(limit);
-      const offset = (pageNum - 1) * limitNum;
-      
-      // This would need to be implemented in storage layer
-      // For now, return a simple response
-      res.json({
-        message: 'User listing endpoint - to be implemented',
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          offset
-        },
-        filters: {
-          search,
-          status
-        }
-      });
-      
-    } catch (error: any) {
-      console.error('Admin list users error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  });
-  
   // PUT /api/v1/admin/users/{userId}/status - Update user status (admin only)
   app.put('/api/v1/admin/users/:userId/status', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
     try {

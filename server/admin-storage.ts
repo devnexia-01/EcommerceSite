@@ -270,6 +270,71 @@ export class AdminStorage {
       .where(eq(users.id, userId));
   }
 
+  // Order Management (Admin)
+  async getAllOrders(params: {
+    search?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ orders: any[]; total: number }> {
+    const { search, status, sortBy = 'createdAt', sortOrder = 'desc', limit = 50, offset = 0 } = params;
+
+    const conditions: any[] = [];
+
+    if (search) {
+      conditions.push(
+        or(
+          ilike(orders.orderNumber, `%${search}%`),
+          ilike(orders.id, `%${search}%`)
+        )
+      );
+    }
+
+    if (status) {
+      conditions.push(eq(orders.status, status));
+    }
+
+    const whereCondition = conditions.length === 1 ? conditions[0] : 
+                           conditions.length > 1 ? and(...conditions) : undefined;
+
+    let baseQuery = db.select().from(orders).leftJoin(users, eq(orders.userId, users.id));
+    let countBaseQuery = db.select({ count: count() }).from(orders);
+
+    if (whereCondition) {
+      baseQuery = baseQuery.where(whereCondition);
+      countBaseQuery = countBaseQuery.where(whereCondition);
+    }
+
+    // Apply sorting
+    const sortMap = {
+      orderNumber: orders.orderNumber,
+      createdAt: orders.createdAt,
+      total: orders.total,
+      status: orders.status
+    } as const;
+    
+    const sortColumn = sortMap[sortBy as keyof typeof sortMap] ?? orders.createdAt;
+    const finalQuery = baseQuery.orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn)).limit(limit).offset(offset);
+
+    const [ordersResult, totalResult] = await Promise.all([
+      finalQuery,
+      countBaseQuery
+    ]);
+
+    // Format the result to include user data
+    const formattedOrders = ordersResult.map(row => ({
+      ...row.orders,
+      user: row.users
+    }));
+
+    return {
+      orders: formattedOrders,
+      total: totalResult[0].count
+    };
+  }
+
   // Content Management
   async getContent(params: {
     type?: string;
