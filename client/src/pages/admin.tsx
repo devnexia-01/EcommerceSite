@@ -343,8 +343,8 @@ export default function Admin() {
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
-      await apiRequest("PUT", `/api/orders/${orderId}/status`, { status });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      await apiRequest("PUT", `/api/v1/orders/${orderId}/status`, { status });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/orders"] });
       toast({ title: "Success", description: "Order status updated" });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
