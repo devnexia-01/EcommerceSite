@@ -10,22 +10,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### October 12, 2025 - Admin Panel Action Buttons Implementation
-- **Issue Fixed**: Non-functional action buttons in admin panel for user management and order details
+### October 12, 2025 - Admin Panel User Management Enhancement
+- **Issue Fixed**: Non-functional and incomplete user management buttons in admin panel
 - **Changes Made**:
-  - Added `handleViewUser` function to display user details (email, name, roles) in a toast notification
-  - Added `handleSuspendUser` function to suspend users with confirmation dialog and API integration
-  - Added `handleResetPassword` function to send password reset emails with confirmation and user email display
-  - Added `handleViewOrder` function to display order summary (order number, total, status, items) in a toast notification
-  - Attached onClick handlers to all previously non-functional buttons:
-    - View user button (Eye icon)
-    - Suspend user button (Ban icon)
-    - Reset password button (Key icon)
-    - View order details button
-  - Implemented proper error handling with toast notifications for all actions
-  - Added query invalidation to refresh user list after suspend action
-  - All handlers include appropriate user confirmations for destructive actions
-- **User Flow**: Admin users can now interact with all action buttons in the admin panel. User management buttons show details or perform actions with confirmations, and order details button displays a summary. All actions provide feedback through toast notifications.
+  - **User Details Dialog**: Created comprehensive user details dialog showing:
+    - Full user information: email, username, full name, status, roles, and last login time
+    - Complete order history table with order number, date, items count, total, and status
+    - Responsive layout with proper loading states
+  - **Smart Suspend/Unsuspend Toggle**: 
+    - Button icon changes based on user status (Ban icon for active users, CheckCircle for suspended)
+    - Dynamically shows "Suspend" or "Unsuspend" action based on current user status
+    - Confirmation dialog displays appropriate action text
+    - API integration with `/api/v1/admin/users/:userId/status` endpoint
+  - **Enhanced View User**: Clicking Eye icon opens detailed dialog instead of simple toast
+  - **Reset Password**: Sends password reset email with user confirmation
+  - **Improved Error Handling**: All actions include proper error messages and success feedback
+  - **Data Synchronization**: User list automatically refreshes after status changes
+- **User Flow**: Admins can click Eye icon to view complete user details and order history in a dialog. The suspend button intelligently toggles between suspend/unsuspend based on user status. Reset password sends email with confirmation. All actions provide clear feedback through notifications.
 
 ### October 11, 2025 - Cancel Order Feature Implementation
 - **Feature Added**: Users can now cancel their orders directly from the order details page (for cancellable order statuses)
