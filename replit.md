@@ -10,6 +10,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 12, 2025 - Admin Panel Action Buttons Implementation
+- **Issue Fixed**: Non-functional action buttons in admin panel for user management and order details
+- **Changes Made**:
+  - Added `handleViewUser` function to display user details (email, name, roles) in a toast notification
+  - Added `handleSuspendUser` function to suspend users with confirmation dialog and API integration
+  - Added `handleResetPassword` function to send password reset emails with confirmation and user email display
+  - Added `handleViewOrder` function to display order summary (order number, total, status, items) in a toast notification
+  - Attached onClick handlers to all previously non-functional buttons:
+    - View user button (Eye icon)
+    - Suspend user button (Ban icon)
+    - Reset password button (Key icon)
+    - View order details button
+  - Implemented proper error handling with toast notifications for all actions
+  - Added query invalidation to refresh user list after suspend action
+  - All handlers include appropriate user confirmations for destructive actions
+- **User Flow**: Admin users can now interact with all action buttons in the admin panel. User management buttons show details or perform actions with confirmations, and order details button displays a summary. All actions provide feedback through toast notifications.
+
 ### October 11, 2025 - Cancel Order Feature Implementation
 - **Feature Added**: Users can now cancel their orders directly from the order details page (for cancellable order statuses)
 - **Changes Made**:

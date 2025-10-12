@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { 
   Plus, Edit, Trash2, Package, Users, ShoppingCart, TrendingUp, Search, Filter,
   Shield, Settings, FileText, Image, AlertTriangle, Activity, Database,
-  Clock, Eye, Ban, UserMinus, Key, Download, Upload, Server, BarChart3
+  Clock, Eye, Ban, UserMinus, Key, Download, Upload, Server, BarChart3, CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,8 @@ export default function Admin() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
+  const [isUserDetailsDialogOpen, setIsUserDetailsDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,6 +148,13 @@ export default function Admin() {
   });
 
   const contentItems = (contentData as any)?.data || (contentData as any) || [];
+
+  const { data: userOrdersData, isLoading: userOrdersLoading } = useQuery({
+    queryKey: ["/api/v1/admin/orders", { userId: selectedUser?.id }],
+    enabled: isAuthenticated && user?.isAdmin && !!selectedUser?.id && isUserDetailsDialogOpen
+  });
+
+  const userOrders = selectedUser ? ((userOrdersData as any)?.data || (userOrdersData as any) || []).filter((order: any) => order.userId === selectedUser.id) : [];
 
   // Mutations
   const createProductMutation = useMutation({
@@ -352,35 +361,37 @@ export default function Admin() {
   };
 
   const handleViewUser = (userId: string) => {
-    const selectedUser = adminUsers.find((u: any) => u.id === userId);
-    if (selectedUser) {
-      toast({ 
-        title: "User Details", 
-        description: `Email: ${selectedUser.email}\nName: ${selectedUser.firstName || ''} ${selectedUser.lastName || ''}\nRoles: ${selectedUser.roles?.join(', ') || 'None'}` 
-      });
+    const user = adminUsers.find((u: any) => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setIsUserDetailsDialogOpen(true);
     }
   };
 
-  const handleSuspendUser = async (userId: string) => {
-    if (confirm("Are you sure you want to suspend this user?")) {
+  const handleToggleSuspendUser = async (userId: string, currentStatus: string) => {
+    const isSuspended = currentStatus === "suspended";
+    const action = isSuspended ? "unsuspend" : "suspend";
+    const newStatus = isSuspended ? "active" : "suspended";
+    
+    if (confirm(`Are you sure you want to ${action} this user?`)) {
       try {
-        await apiRequest("PUT", `/api/v1/admin/users/${userId}/status`, { status: "suspended" });
+        await apiRequest("PUT", `/api/v1/admin/users/${userId}/status`, { status: newStatus });
         queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/users"] });
-        toast({ title: "Success", description: "User suspended successfully" });
+        toast({ title: "Success", description: `User ${action}ed successfully` });
       } catch (error: any) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        toast({ title: "Error", description: error.message || "Failed to update user status", variant: "destructive" });
       }
     }
   };
 
   const handleResetPassword = async (userId: string) => {
-    const selectedUser = adminUsers.find((u: any) => u.id === userId);
-    if (selectedUser && confirm(`Send password reset email to ${selectedUser.email}?`)) {
+    const targetUser = adminUsers.find((u: any) => u.id === userId);
+    if (targetUser && confirm(`Send password reset email to ${targetUser.email}?`)) {
       try {
         await apiRequest("POST", `/api/v1/admin/users/${userId}/reset-password`);
         toast({ title: "Success", description: "Password reset email sent" });
       } catch (error: any) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        toast({ title: "Error", description: error.message || "Failed to send reset email", variant: "destructive" });
       }
     }
   };
@@ -757,10 +768,14 @@ export default function Admin() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                onClick={() => handleSuspendUser(user.id)}
+                                onClick={() => handleToggleSuspendUser(user.id, user.status)}
                                 data-testid={`suspend-user-${user.id}`}
                               >
-                                <Ban className="h-3 w-3" />
+                                {user.status === "suspended" ? (
+                                  <CheckCircle className="h-3 w-3" />
+                                ) : (
+                                  <Ban className="h-3 w-3" />
+                                )}
                               </Button>
                               <Button 
                                 variant="outline" 
@@ -1739,6 +1754,104 @@ export default function Admin() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* User Details Dialog */}
+        <Dialog open={isUserDetailsDialogOpen} onOpenChange={setIsUserDetailsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>User Details</DialogTitle>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-6">
+                {/* User Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">User Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">Email</Label>
+                        <p className="font-medium">{selectedUser.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Username</Label>
+                        <p className="font-medium">{selectedUser.username || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Full Name</Label>
+                        <p className="font-medium">
+                          {selectedUser.firstName || selectedUser.lastName 
+                            ? `${selectedUser.firstName || ''} ${selectedUser.lastName || ''}`.trim()
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Status</Label>
+                        <Badge variant={selectedUser.status === "active" ? "default" : "secondary"}>
+                          {selectedUser.status}
+                        </Badge>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Roles</Label>
+                        <p className="font-medium">{selectedUser.roles?.join(', ') || 'None'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Last Login</Label>
+                        <p className="font-medium">
+                          {selectedUser.lastLoginAt 
+                            ? new Date(selectedUser.lastLoginAt).toLocaleString()
+                            : 'Never'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Order History */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Order History</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {userOrdersLoading ? (
+                      <LoadingSpinner className="mx-auto" />
+                    ) : userOrders && userOrders.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Order #</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Items</TableHead>
+                            <TableHead>Total</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {userOrders.map((order: any) => (
+                            <TableRow key={order.id}>
+                              <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                              <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>{order.orderItems?.length || 0} items</TableCell>
+                              <TableCell>${parseFloat(order.total).toFixed(2)}</TableCell>
+                              <TableCell>
+                                <Badge variant={order.status === "delivered" ? "default" : "secondary"}>
+                                  {order.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-4">No orders found</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
