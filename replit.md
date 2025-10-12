@@ -10,6 +10,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 12, 2025 - Buy Now Authentication Fix
+- **Issue Fixed**: "Failed to create purchase intent" error when users tried to use the Buy Now feature
+- **Root Cause**: Buy-now routes were using JWT token authentication (`authenticateToken`) but the frontend uses session-based authentication with cookies
+- **Changes Made**:
+  - Replaced JWT authentication middleware with session-based authentication in all buy-now routes
+  - Updated routes to use `req.session.userId` instead of `req.user.userId`
+  - Fixed TypeScript type issues with customization fields and order items
+  - All buy-now endpoints now properly authenticate users via session cookies
+- **Technical Details**: The app has two parallel authentication systems (JWT for v1 API routes, session-based for main routes). Buy-now routes incorrectly used JWT auth, causing authentication failures since the frontend doesn't send JWT tokens.
+- **User Impact**: Buy Now feature now works correctly for authenticated users
+
 ### October 12, 2025 - Admin Panel User Management Enhancement
 - **Issue Fixed**: Non-functional and incomplete user management buttons in admin panel
 - **Changes Made**:
