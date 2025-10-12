@@ -351,6 +351,50 @@ export default function Admin() {
     }
   };
 
+  const handleViewUser = (userId: string) => {
+    const selectedUser = adminUsers.find((u: any) => u.id === userId);
+    if (selectedUser) {
+      toast({ 
+        title: "User Details", 
+        description: `Email: ${selectedUser.email}\nName: ${selectedUser.firstName || ''} ${selectedUser.lastName || ''}\nRoles: ${selectedUser.roles?.join(', ') || 'None'}` 
+      });
+    }
+  };
+
+  const handleSuspendUser = async (userId: string) => {
+    if (confirm("Are you sure you want to suspend this user?")) {
+      try {
+        await apiRequest("PUT", `/api/v1/admin/users/${userId}/status`, { status: "suspended" });
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/users"] });
+        toast({ title: "Success", description: "User suspended successfully" });
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    const selectedUser = adminUsers.find((u: any) => u.id === userId);
+    if (selectedUser && confirm(`Send password reset email to ${selectedUser.email}?`)) {
+      try {
+        await apiRequest("POST", `/api/v1/admin/users/${userId}/reset-password`);
+        toast({ title: "Success", description: "Password reset email sent" });
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleViewOrder = (orderId: string) => {
+    const selectedOrder = orders.find((o: any) => o.id === orderId);
+    if (selectedOrder) {
+      toast({ 
+        title: "Order Details", 
+        description: `Order #${selectedOrder.orderNumber}\nTotal: $${parseFloat(selectedOrder.total).toFixed(2)}\nStatus: ${selectedOrder.status}\nItems: ${selectedOrder.orderItems?.length || 0}` 
+      });
+    }
+  };
+
   const stats = (dashboardOverview as any)?.data ? {
     totalProducts: (dashboardOverview as any).data.totalProducts || 0,
     totalUsers: (dashboardOverview as any).data.totalUsers || 0,
@@ -702,13 +746,28 @@ export default function Admin() {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm" data-testid={`view-user-${user.id}`}>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleViewUser(user.id)}
+                                data-testid={`view-user-${user.id}`}
+                              >
                                 <Eye className="h-3 w-3" />
                               </Button>
-                              <Button variant="outline" size="sm" data-testid={`suspend-user-${user.id}`}>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSuspendUser(user.id)}
+                                data-testid={`suspend-user-${user.id}`}
+                              >
                                 <Ban className="h-3 w-3" />
                               </Button>
-                              <Button variant="outline" size="sm" data-testid={`reset-password-${user.id}`}>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleResetPassword(user.id)}
+                                data-testid={`reset-password-${user.id}`}
+                              >
                                 <Key className="h-3 w-3" />
                               </Button>
                             </div>
@@ -1007,6 +1066,7 @@ export default function Admin() {
                             <Button 
                               variant="outline" 
                               size="sm"
+                              onClick={() => handleViewOrder(order.id)}
                               data-testid={`view-order-${order.id}`}
                             >
                               View Details
