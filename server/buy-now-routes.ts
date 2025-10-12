@@ -1,7 +1,14 @@
 import type { Express, Request, Response } from 'express';
 import { z } from 'zod';
 import { storage } from './storage';
-import { authenticateToken, type AuthenticatedRequest } from './auth-routes';
+
+// Session-based authentication middleware
+const requireSessionAuth = (req: Request, res: Response, next: any) => {
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  next();
+};
 
 // Validation schemas
 const createPurchaseIntentSchema = z.object({
@@ -24,12 +31,12 @@ const completePurchaseIntentSchema = z.object({
 export function setupBuyNowRoutes(app: Express) {
 
   // Create buy now purchase intent - requires authentication
-  app.post('/api/buy-now/create-intent', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/buy-now/create-intent', requireSessionAuth, async (req: Request, res: Response) => {
     try {
       const { productId, variantId, quantity, customization } = createPurchaseIntentSchema.parse(req.body);
 
-      // Get authenticated user ID
-      const userId = req.user!.userId;
+      // Get authenticated user ID from session
+      const userId = req.session.userId!;
 
       // Get product details and check availability
       const product = await storage.getProduct(productId);
@@ -58,7 +65,7 @@ export function setupBuyNowRoutes(app: Express) {
         variantId,
         quantity,
         price: price.toString(),
-        customization: customization || undefined,
+        customization: (customization || undefined) as any,
         status: 'pending',
         expiresAt
       });
@@ -93,7 +100,7 @@ export function setupBuyNowRoutes(app: Express) {
   });
 
   // Get purchase intent details - requires authentication
-  app.get('/api/buy-now/intent/:intentId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/buy-now/intent/:intentId', requireSessionAuth, async (req: Request, res: Response) => {
     try {
       const { intentId } = req.params;
       
@@ -107,7 +114,7 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Verify ownership - user can only access their own purchase intents
-      if (intent.userId !== req.user!.userId) {
+      if (intent.userId !== req.session.userId!) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
@@ -153,7 +160,7 @@ export function setupBuyNowRoutes(app: Express) {
   });
 
   // Save shipping address to purchase intent - requires authentication
-  app.post('/api/buy-now/intent/:intentId/address', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/buy-now/intent/:intentId/address', requireSessionAuth, async (req: Request, res: Response) => {
     try {
       const { intentId } = req.params;
       const { shippingAddress, email, phone } = req.body;
@@ -172,7 +179,7 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Verify ownership - user can only update their own purchase intents
-      if (intent.userId !== req.user!.userId) {
+      if (intent.userId !== req.session.userId!) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
@@ -197,7 +204,7 @@ export function setupBuyNowRoutes(app: Express) {
   });
 
   // Complete purchase intent (convert to order) - requires authentication
-  app.post('/api/buy-now/complete', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/buy-now/complete', requireSessionAuth, async (req: Request, res: Response) => {
     try {
       const { intentId, paymentMethod } = completePurchaseIntentSchema.parse(req.body);
 
@@ -207,7 +214,7 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Verify ownership - user can only complete their own purchase intents
-      if (intent.userId !== req.user!.userId) {
+      if (intent.userId !== req.session.userId!) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
@@ -258,9 +265,9 @@ export function setupBuyNowRoutes(app: Express) {
       // Use shipping address as billing address for buy-now orders
       const billingAddressObj = { ...shippingAddressObj };
 
-      // Create order record - use authenticated user ID since this is a protected endpoint
+      // Create order record - use authenticated user ID from session
       const orderData = {
-        userId: req.user!.userId,
+        userId: req.session.userId!,
         orderNumber: orderNumber,
         status: 'pending',
         subtotal: subtotal.toFixed(2),
@@ -277,6 +284,7 @@ export function setupBuyNowRoutes(app: Express) {
       const itemTotal = unitPrice * intent.quantity;
       
       const orderItems = [{
+        orderId: '',
         productId: intent.productId,
         variantId: intent.variantId || null,
         sku: product.sku || `SKU-${Date.now()}-${intent.productId.slice(-8)}`,
@@ -287,7 +295,7 @@ export function setupBuyNowRoutes(app: Express) {
         totalPrice: itemTotal.toFixed(2),
         price: unitPrice.toFixed(2),
         total: itemTotal.toFixed(2),
-        customization: intent.customization || null
+        customization: intent.customization as any
       }];
 
       // Create the order in the database
@@ -313,7 +321,7 @@ export function setupBuyNowRoutes(app: Express) {
   });
 
   // Cancel purchase intent - requires authentication
-  app.post('/api/buy-now/cancel/:intentId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/buy-now/cancel/:intentId', requireSessionAuth, async (req: Request, res: Response) => {
     try {
       const { intentId } = req.params;
       
@@ -323,7 +331,7 @@ export function setupBuyNowRoutes(app: Express) {
       }
 
       // Verify ownership - user can only cancel their own purchase intents
-      if (intent.userId !== req.user!.userId) {
+      if (intent.userId !== req.session.userId!) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
