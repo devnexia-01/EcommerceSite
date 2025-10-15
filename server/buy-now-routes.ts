@@ -61,7 +61,7 @@ export function setupBuyNowRoutes(app: Express) {
 
       const intent = await storage.createPurchaseIntent({
         userId: userId || undefined,
-        sessionId: userId ? undefined : sessionId, // Use sessionId for guests
+        sessionId: sessionId, // Store sessionId for both guests and logged-in users as fallback
         productId,
         variantId,
         quantity,
