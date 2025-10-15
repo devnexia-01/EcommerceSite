@@ -440,7 +440,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createProduct(product: InsertProduct): Promise<ProductType> {
-    const newProduct = await Product.create(product);
+    const newProduct = await Product.create({ _id: nanoid(), ...product });
     return toPlainObject(newProduct);
   }
 
@@ -817,7 +817,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createContent(content: InsertContent): Promise<ContentType> {
-    const newContent = await Content.create(content);
+    const newContent = await Content.create({ _id: nanoid(), ...content });
     return toPlainObject(newContent);
   }
 

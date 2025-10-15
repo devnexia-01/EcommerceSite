@@ -131,9 +131,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/v1/payments/cod", authenticateToken, processCODPayment);
   app.post("/api/v1/payments/cod/confirm", authenticateToken, confirmCODPayment);
   
-  // Setup wishlist routes
-  const { default: wishlistRoutes } = await import("./wishlist-routes.js");
-  app.use("/api/wishlists", wishlistRoutes);
+  // Setup wishlist routes (disabled - needs MongoDB migration)
+  // const { default: wishlistRoutes } = await import("./wishlist-routes.js");
+  // app.use("/api/wishlists", wishlistRoutes);
   
   // Setup content routes (footer links, contact, support, etc.)
   const { default: contentRoutes } = await import("./content-routes.js");

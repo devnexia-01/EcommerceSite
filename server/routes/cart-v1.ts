@@ -28,7 +28,7 @@ const asyncHandler = (fn: Function) => (req: AuthenticatedRequest, res: express.
 
 // Validation schemas
 const addToCartSchema = z.object({
-  productId: z.string().uuid(),
+  productId: z.string().min(1),
   quantity: z.number().int().positive().max(100).default(1)
 });
 

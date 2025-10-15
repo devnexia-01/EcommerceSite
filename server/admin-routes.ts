@@ -818,8 +818,9 @@ export function setupAdminRoutes(app: Express) {
     }
   });
 
-  // ============= AUDIT LOGS =============
+  // ============= AUDIT LOGS (DISABLED) =============
   
+  /* DISABLED PER USER REQUEST
   // GET /api/v1/admin/audit/logs
   app.get('/api/v1/admin/audit/logs', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -887,6 +888,7 @@ export function setupAdminRoutes(app: Express) {
       });
     }
   });
+  */
 
   // ============= SYSTEM CONFIGURATION =============
   
@@ -1320,8 +1322,9 @@ export function setupAdminRoutes(app: Express) {
     }
   });
 
-  // ============= SECURITY MONITORING =============
+  // ============= SECURITY MONITORING (DISABLED) =============
   
+  /* DISABLED PER USER REQUEST
   // GET /api/v1/admin/security/threats
   app.get('/api/v1/admin/security/threats', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -1450,6 +1453,7 @@ export function setupAdminRoutes(app: Express) {
       });
     }
   });
+  */
 
   // ============= SYSTEM OPERATIONS =============
   

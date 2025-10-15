@@ -12,8 +12,8 @@ const requireSessionAuth = (req: Request, res: Response, next: any) => {
 
 // Validation schemas
 const createPurchaseIntentSchema = z.object({
-  productId: z.string().uuid("Invalid product ID"),
-  variantId: z.string().uuid().optional(),
+  productId: z.string().min(1),
+  variantId: z.string().min(1).optional(),
   quantity: z.number().int().min(1).max(10).default(1),
   customization: z.object({
     color: z.string().optional(),
@@ -24,19 +24,20 @@ const createPurchaseIntentSchema = z.object({
 });
 
 const completePurchaseIntentSchema = z.object({
-  intentId: z.string().uuid("Invalid intent ID"),
+  intentId: z.string().min(1),
   paymentMethod: z.enum(["online", "cod"]).optional().default("online")
 });
 
 export function setupBuyNowRoutes(app: Express) {
 
-  // Create buy now purchase intent - requires authentication
-  app.post('/api/buy-now/create-intent', requireSessionAuth, async (req: Request, res: Response) => {
+  // Create buy now purchase intent - allows guest checkout
+  app.post('/api/buy-now/create-intent', async (req: Request, res: Response) => {
     try {
       const { productId, variantId, quantity, customization } = createPurchaseIntentSchema.parse(req.body);
 
-      // Get authenticated user ID from session
-      const userId = req.session.userId!;
+      // Get user ID from session (optional for guest checkout)
+      const userId = req.session?.userId;
+      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
 
       // Get product details and check availability
       const product = await storage.getProduct(productId);
@@ -59,8 +60,8 @@ export function setupBuyNowRoutes(app: Express) {
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
       const intent = await storage.createPurchaseIntent({
-        userId,
-        sessionId: undefined, // No session ID needed for authenticated users
+        userId: userId || undefined,
+        sessionId: userId ? undefined : sessionId, // Use sessionId for guests
         productId,
         variantId,
         quantity,
