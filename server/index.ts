@@ -14,6 +14,7 @@ import {
 import { seed } from "./seed";
 import { connectToDatabase } from "./db";
 import { Product } from "./models";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -68,10 +69,10 @@ app.use((req, res, next) => {
 // Function to check if database needs seeding
 async function autoSeed() {
   try {
-    // Check if database has any products (indicating it's already seeded)
-    const existingProducts = await Product.findOne().limit(1);
+    // Check if database has any products using storage
+    const { products } = await storage.getProducts({ limit: 1 });
     
-    if (!existingProducts) {
+    if (products.length === 0) {
       log("🌱 Database is empty, running automatic seeding...");
       await seed();
       log("✅ Automatic database seeding completed!");

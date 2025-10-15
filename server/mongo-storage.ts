@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import { nanoid } from 'nanoid';
 import {
   User, Category, Brand, Product, Address, Cart, CartItem, Order, OrderItem, Review,
   UserPreferences, UserSettings, RefreshToken, PasswordResetToken, LoginSession,
@@ -84,7 +85,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createRefreshToken(token: InsertRefreshToken): Promise<RefreshTokenType> {
-    const refreshToken = await RefreshToken.create(token);
+    const refreshToken = await RefreshToken.create({ _id: nanoid(), ...token });
     return toPlainObject(refreshToken);
   }
 
@@ -106,7 +107,7 @@ export class MongoStorage implements IStorage {
 
   // Password Reset methods
   async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetTokenType> {
-    const resetToken = await PasswordResetToken.create(token);
+    const resetToken = await PasswordResetToken.create({ _id: nanoid(), ...token });
     return toPlainObject(resetToken);
   }
 
@@ -130,7 +131,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferencesType> {
-    const newPreferences = await UserPreferences.create(preferences);
+    const newPreferences = await UserPreferences.create({ _id: nanoid(), ...preferences });
     return toPlainObject(newPreferences);
   }
 
@@ -150,7 +151,7 @@ export class MongoStorage implements IStorage {
   }
 
   async createUserSettings(settings: InsertUserSettings): Promise<UserSettingsType> {
-    const newSettings = await UserSettings.create(settings);
+    const newSettings = await UserSettings.create({ _id: nanoid(), ...settings });
     return toPlainObject(newSettings);
   }
 
@@ -310,7 +311,7 @@ export class MongoStorage implements IStorage {
 
   // Login Session methods
   async createLoginSession(session: InsertLoginSession): Promise<LoginSessionType> {
-    const loginSession = await LoginSession.create(session);
+    const loginSession = await LoginSession.create({ _id: nanoid(), ...session });
     return toPlainObject(loginSession);
   }
 
