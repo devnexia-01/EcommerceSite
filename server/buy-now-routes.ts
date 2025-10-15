@@ -118,11 +118,22 @@ export function setupBuyNowRoutes(app: Express) {
       const userId = req.session?.userId;
       const sessionId = req.sessionID || req.headers['x-session-id'] as string;
       
+      console.log('Buy-now GET intent - Debug:', {
+        intentId,
+        intentUserId: intent.userId,
+        intentSessionId: intent.sessionId,
+        currentUserId: userId,
+        reqSessionID: req.sessionID,
+        headerSessionId: req.headers['x-session-id'],
+        finalSessionId: sessionId
+      });
+      
       // Strict ownership check: require exact match of either userId or sessionId
       const isOwner = (intent.userId && intent.userId === userId) || 
                      (intent.sessionId && intent.sessionId === sessionId);
       
       if (!isOwner) {
+        console.log('Access denied - ownership check failed');
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
