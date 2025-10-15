@@ -26,8 +26,6 @@ import {
   type EmailSubscription, type InsertEmailSubscription,
   type PurchaseIntent, type InsertPurchaseIntent
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, asc, ilike, and, sql, count, or, gte, lte } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 export interface IStorage {
@@ -1671,4 +1669,11 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Import MongoDB storage implementation
+import { mongoStorage } from "./mongo-storage";
+
+// Export MongoDB storage as the primary storage implementation
+export const storage = mongoStorage;
+
+// Keep DatabaseStorage class for reference but don't use it
+// export const storage = new DatabaseStorage();

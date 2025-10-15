@@ -1,11 +1,6 @@
-import { eq, and } from "drizzle-orm";
-import { db } from "../db";
+import { nanoid } from "nanoid";
 import WebSocketService from "./websocket-service";
-import { 
-  carts, 
-  enhancedCartItems, 
-  products
-} from "../../shared/schema";
+import { Cart as CartModel, CartItem as CartItemModel, Product } from "../models";
 
 export interface CartItem {
   id: string;
@@ -38,35 +33,27 @@ export class CartService {
 
     let cart;
     if (userId) {
-      [cart] = await db
-        .select()
-        .from(carts)
-        .where(eq(carts.userId, userId))
-        .limit(1);
+      cart = await CartModel.findOne({ userId }).exec();
     } else if (sessionId) {
-      [cart] = await db
-        .select()
-        .from(carts)
-        .where(eq(carts.sessionId, sessionId))
-        .limit(1);
+      cart = await CartModel.findOne({ sessionId }).exec();
     }
 
     if (!cart) {
-      [cart] = await db
-        .insert(carts)
-        .values({
-          userId: userId || null,
-          sessionId: sessionId || null,
-          subtotal: "0",
-          tax: "0",
-          shipping: "0",
-          total: "0",
-          currency: "USD"
-        })
-        .returning();
+      const cartId = nanoid();
+      cart = await CartModel.create({
+        _id: cartId,
+        userId: userId || undefined,
+        sessionId: sessionId || undefined,
+        subtotal: 0,
+        tax: 0,
+        shipping: 0,
+        discount: 0,
+        total: 0,
+        currency: "USD"
+      });
     }
 
-    return cart.id;
+    return cart._id;
   }
 
   // Get cart with items
@@ -77,17 +64,9 @@ export class CartService {
 
     let cart;
     if (userId) {
-      [cart] = await db
-        .select()
-        .from(carts)
-        .where(eq(carts.userId, userId))
-        .limit(1);
+      cart = await CartModel.findOne({ userId }).exec();
     } else if (sessionId) {
-      [cart] = await db
-        .select()
-        .from(carts)
-        .where(eq(carts.sessionId, sessionId))
-        .limit(1);
+      cart = await CartModel.findOne({ sessionId }).exec();
     }
 
     if (!cart) {
@@ -95,37 +74,36 @@ export class CartService {
     }
 
     // Get cart items with product details
-    const items = await db
-      .select({
-        id: enhancedCartItems.id,
-        cartId: enhancedCartItems.cartId,
-        productId: enhancedCartItems.productId,
-        quantity: enhancedCartItems.quantity,
-        price: enhancedCartItems.price,
-        addedAt: enhancedCartItems.addedAt,
-        product: products
+    const items = await CartItemModel.find({
+      cartId: cart._id,
+      savedForLater: false
+    }).exec();
+
+    // Populate product details for each item
+    const itemsWithProducts = await Promise.all(
+      items.map(async (item) => {
+        const product = await Product.findById(item.productId).exec();
+        return {
+          id: item._id,
+          cartId: item.cartId,
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price.toString(),
+          addedAt: item.addedAt || new Date(),
+          product: product
+        };
       })
-      .from(enhancedCartItems)
-      .leftJoin(products, eq(enhancedCartItems.productId, products.id))
-      .where(and(eq(enhancedCartItems.cartId, cart.id), eq(enhancedCartItems.savedForLater, false)));
+    );
 
     return {
-      id: cart.id,
+      id: cart._id,
       userId: cart.userId || undefined,
       sessionId: cart.sessionId || undefined,
-      items: items.map((item: any) => ({
-        id: item.id,
-        cartId: item.cartId,
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-        addedAt: item.addedAt!,
-        product: item.product
-      })),
-      subtotal: cart.subtotal!,
-      tax: cart.tax!,
-      shipping: cart.shipping!,
-      total: cart.total!
+      items: itemsWithProducts,
+      subtotal: cart.subtotal.toString(),
+      tax: cart.tax.toString(),
+      shipping: cart.shipping.toString(),
+      total: cart.total.toString()
     };
   }
 
@@ -139,86 +117,61 @@ export class CartService {
     const cartId = await this.getOrCreateCart(userId, sessionId);
 
     // Check if item already exists in cart
-    const [existingItem] = await db
-      .select()
-      .from(enhancedCartItems)
-      .where(and(
-        eq(enhancedCartItems.cartId, cartId),
-        eq(enhancedCartItems.productId, productId),
-        eq(enhancedCartItems.savedForLater, false)
-      ))
-      .limit(1);
+    const existingItem = await CartItemModel.findOne({
+      cartId,
+      productId,
+      savedForLater: false
+    }).exec();
 
     let cartItem;
     if (existingItem) {
       // Update quantity
-      [cartItem] = await db
-        .update(enhancedCartItems)
-        .set({
-          quantity: existingItem.quantity + quantity,
-          updatedAt: new Date()
-        })
-        .where(eq(enhancedCartItems.id, existingItem.id))
-        .returning();
+      existingItem.quantity += quantity;
+      existingItem.updatedAt = new Date();
+      cartItem = await existingItem.save();
     } else {
       // Get product price
-      const [product] = await db
-        .select()
-        .from(products)
-        .where(eq(products.id, productId))
-        .limit(1);
+      const product = await Product.findById(productId).exec();
 
       if (!product) {
         throw new Error("Product not found");
       }
 
       // Add new item
-      [cartItem] = await db
-        .insert(enhancedCartItems)
-        .values({
-          cartId,
-          productId,
-          quantity,
-          price: product.price,
-          discount: "0",
-          savedForLater: false
-        })
-        .returning();
+      const itemId = nanoid();
+      cartItem = await CartItemModel.create({
+        _id: itemId,
+        cartId,
+        productId,
+        quantity,
+        price: product.price,
+        discount: 0,
+        savedForLater: false,
+        addedAt: new Date()
+      });
     }
 
     // Recalculate cart totals
     await this.recalculateCartTotals(cartId);
 
     // Get the item with product details
-    const [itemWithProduct] = await db
-      .select({
-        id: enhancedCartItems.id,
-        cartId: enhancedCartItems.cartId,
-        productId: enhancedCartItems.productId,
-        quantity: enhancedCartItems.quantity,
-        price: enhancedCartItems.price,
-        addedAt: enhancedCartItems.addedAt,
-        product: products
-      })
-      .from(enhancedCartItems)
-      .leftJoin(products, eq(enhancedCartItems.productId, products.id))
-      .where(eq(enhancedCartItems.id, cartItem.id))
-      .limit(1);
+    const product = await Product.findById(cartItem.productId).exec();
+    const itemWithProduct = {
+      id: cartItem._id,
+      cartId: cartItem.cartId,
+      productId: cartItem.productId,
+      quantity: cartItem.quantity,
+      price: cartItem.price.toString(),
+      addedAt: cartItem.addedAt || new Date(),
+      product: product
+    };
 
     // Emit WebSocket events
     const websocketService = WebSocketService.getInstance();
     websocketService.emitCartItemAdded(userId, sessionId, itemWithProduct);
     websocketService.emitCartUpdate(userId, sessionId);
 
-    return {
-      id: itemWithProduct.id,
-      cartId: itemWithProduct.cartId,
-      productId: itemWithProduct.productId,
-      quantity: itemWithProduct.quantity,
-      price: itemWithProduct.price,
-      addedAt: itemWithProduct.addedAt!,
-      product: itemWithProduct.product
-    };
+    return itemWithProduct;
   }
 
   // Update cart item quantity
@@ -228,25 +181,18 @@ export class CartService {
       return;
     }
 
-    const [cartItem] = await db
-      .update(enhancedCartItems)
-      .set({
-        quantity,
-        updatedAt: new Date()
-      })
-      .where(eq(enhancedCartItems.id, itemId))
-      .returning();
+    const cartItem = await CartItemModel.findById(itemId).exec();
 
     if (!cartItem) {
       throw new Error("Cart item not found");
     }
 
+    cartItem.quantity = quantity;
+    cartItem.updatedAt = new Date();
+    await cartItem.save();
+
     // Get cart info for WebSocket events
-    const [cart] = await db
-      .select()
-      .from(carts)
-      .where(eq(carts.id, cartItem.cartId))
-      .limit(1);
+    const cart = await CartModel.findById(cartItem.cartId).exec();
 
     // Recalculate cart totals
     await this.recalculateCartTotals(cartItem.cartId);
@@ -259,26 +205,16 @@ export class CartService {
 
   // Remove item from cart
   async removeFromCart(itemId: string): Promise<void> {
-    const [cartItem] = await db
-      .select()
-      .from(enhancedCartItems)
-      .where(eq(enhancedCartItems.id, itemId))
-      .limit(1);
+    const cartItem = await CartItemModel.findById(itemId).exec();
 
     if (!cartItem) {
       throw new Error("Cart item not found");
     }
 
     // Get cart info before deletion
-    const [cart] = await db
-      .select()
-      .from(carts)
-      .where(eq(carts.id, cartItem.cartId))
-      .limit(1);
+    const cart = await CartModel.findById(cartItem.cartId).exec();
 
-    await db
-      .delete(enhancedCartItems)
-      .where(eq(enhancedCartItems.id, itemId));
+    await CartItemModel.findByIdAndDelete(itemId).exec();
 
     // Recalculate cart totals
     await this.recalculateCartTotals(cartItem.cartId);
@@ -293,21 +229,16 @@ export class CartService {
   async clearCart(userId?: string, sessionId?: string): Promise<void> {
     const cartId = await this.getOrCreateCart(userId, sessionId);
 
-    await db
-      .delete(enhancedCartItems)
-      .where(eq(enhancedCartItems.cartId, cartId));
+    await CartItemModel.deleteMany({ cartId }).exec();
 
     // Reset cart totals
-    await db
-      .update(carts)
-      .set({
-        subtotal: "0",
-        tax: "0",
-        shipping: "0",
-        total: "0",
-        updatedAt: new Date()
-      })
-      .where(eq(carts.id, cartId));
+    await CartModel.findByIdAndUpdate(cartId, {
+      subtotal: 0,
+      tax: 0,
+      shipping: 0,
+      total: 0,
+      updatedAt: new Date()
+    }).exec();
 
     // Emit WebSocket events
     const websocketService = WebSocketService.getInstance();
@@ -317,17 +248,14 @@ export class CartService {
   // Recalculate cart totals
   private async recalculateCartTotals(cartId: string): Promise<void> {
     // Get all cart items
-    const items = await db
-      .select()
-      .from(enhancedCartItems)
-      .where(and(
-        eq(enhancedCartItems.cartId, cartId),
-        eq(enhancedCartItems.savedForLater, false)
-      ));
+    const items = await CartItemModel.find({
+      cartId,
+      savedForLater: false
+    }).exec();
 
     // Calculate subtotal
     const subtotal = items.reduce((sum, item) => {
-      return sum + (parseFloat(item.price) * item.quantity);
+      return sum + (item.price * item.quantity);
     }, 0);
 
     // Calculate tax (8.5% for now)
@@ -340,16 +268,13 @@ export class CartService {
     const total = subtotal + tax + shipping;
 
     // Update cart totals
-    await db
-      .update(carts)
-      .set({
-        subtotal: subtotal.toFixed(2),
-        tax: tax.toFixed(2),
-        shipping: shipping.toFixed(2),
-        total: total.toFixed(2),
-        updatedAt: new Date()
-      })
-      .where(eq(carts.id, cartId));
+    await CartModel.findByIdAndUpdate(cartId, {
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      tax: parseFloat(tax.toFixed(2)),
+      shipping: parseFloat(shipping.toFixed(2)),
+      total: parseFloat(total.toFixed(2)),
+      updatedAt: new Date()
+    }).exec();
   }
 }
 

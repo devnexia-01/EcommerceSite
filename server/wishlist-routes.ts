@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { db } from "./db";
 import { wishlists, wishlistItems, products } from "@shared/schema";
 import { authenticateToken } from "./auth-routes.js";
 

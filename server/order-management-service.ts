@@ -1,5 +1,4 @@
 import type { Express, Request, Response } from "express";
-import { db } from "./db";
 import { orders, orderItems, products, users, paymentTransactions, refunds, returns, tracking, trackingEvents, invoices, invoiceLineItems } from "@shared/schema";
 import { eq, desc, and, or } from "drizzle-orm";
 import { authenticateToken } from "./auth-routes";

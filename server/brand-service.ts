@@ -1,4 +1,3 @@
-import { db } from "./db";
 import { brands, products } from "@shared/schema";
 import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
 

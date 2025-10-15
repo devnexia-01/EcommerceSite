@@ -1,6 +1,5 @@
 import { Router, type Request, Response, NextFunction } from "express";
 import { nanoid } from "nanoid";
-import { db } from "./db";
 import { 
   orders, orderItems, returns, returnItems, invoices, invoiceLineItems,
   tracking, trackingEvents, orderStatusHistory, shipments, shipmentItems,

@@ -25,7 +25,6 @@ import {
 import { z } from "zod";
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from "./auth-routes";
 import { nanoid } from "nanoid";
-import { db } from "./db";
 import { 
   orders, orderItems, returns, returnItems, invoices, invoiceLineItems,
   tracking, trackingEvents, orderStatusHistory, shipments, shipmentItems,

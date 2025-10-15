@@ -1,36 +1,45 @@
-import { db } from "./db";
-import { categories, products, users } from "@shared/schema";
+import { User, Category, Product } from "./models";
 import bcrypt from "bcrypt";
+import { nanoid } from "nanoid";
 
 async function seed() {
   try {
     // Create admin user
     const hashedPassword = await bcrypt.hash("admin123", 10);
-    await db.insert(users).values({
-      email: "admin@example.com",
-      username: "admin",
-      passwordHash: hashedPassword,
-      firstName: "Admin",
-      lastName: "User",
-      isAdmin: true,
-      emailVerified: true
-    }).onConflictDoNothing();
+    await User.findOneAndUpdate(
+      { email: "admin@example.com" },
+      {
+        _id: nanoid(),
+        email: "admin@example.com",
+        username: "admin",
+        passwordHash: hashedPassword,
+        firstName: "Admin",
+        lastName: "User",
+        isAdmin: true,
+        emailVerified: true
+      },
+      { upsert: true, new: true }
+    );
 
     // Create sample categories
     const sampleCategories = [
-      { name: "Electronics", slug: "electronics", description: "Latest gadgets and electronics", emoji: "📱" },
-      { name: "Fashion", slug: "fashion", description: "Trendy clothing and accessories", emoji: "👕" },
-      { name: "Home & Garden", slug: "home-garden", description: "Everything for your home", emoji: "🏠" },
-      { name: "Sports", slug: "sports", description: "Sports and fitness equipment", emoji: "🏃‍♂️" },
-      { name: "Books", slug: "books", description: "Books and educational materials", emoji: "📚" }
+      { _id: nanoid(), name: "Electronics", slug: "electronics", description: "Latest gadgets and electronics", emoji: "📱" },
+      { _id: nanoid(), name: "Fashion", slug: "fashion", description: "Trendy clothing and accessories", emoji: "👕" },
+      { _id: nanoid(), name: "Home & Garden", slug: "home-garden", description: "Everything for your home", emoji: "🏠" },
+      { _id: nanoid(), name: "Sports", slug: "sports", description: "Sports and fitness equipment", emoji: "🏃‍♂️" },
+      { _id: nanoid(), name: "Books", slug: "books", description: "Books and educational materials", emoji: "📚" }
     ];
 
     for (const category of sampleCategories) {
-      await db.insert(categories).values(category).onConflictDoNothing();
+      await Category.findOneAndUpdate(
+        { slug: category.slug },
+        category,
+        { upsert: true, new: true }
+      );
     }
 
     // Get categories for product creation
-    const createdCategories = await db.select().from(categories);
+    const createdCategories = await Category.find();
     const electronicsCategory = createdCategories.find(c => c.slug === "electronics");
     const fashionCategory = createdCategories.find(c => c.slug === "fashion");
     const homeCategory = createdCategories.find(c => c.slug === "home-garden");
@@ -116,7 +125,11 @@ async function seed() {
     ];
 
     for (const product of sampleProducts) {
-      await db.insert(products).values(product).onConflictDoNothing();
+      await Product.findOneAndUpdate(
+        { sku: product.sku },
+        { ...product, _id: nanoid() },
+        { upsert: true, new: true }
+      );
     }
 
     console.log("✅ Database seeded successfully!");

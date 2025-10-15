@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { AuthenticatedRequest } from "./auth-routes";
-import { db } from "./db";
 import { 
   paymentMethods, 
   paymentTransactions, 

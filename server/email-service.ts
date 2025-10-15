@@ -4,8 +4,6 @@ import { storage } from './storage';
 
 // Check if email configuration is available (either SMTP or SendGrid)
 const isSMTPEnabled = !!(
-  process.env.SMTP_HOST && 
-  process.env.SMTP_PORT && 
   process.env.SMTP_USER && 
   process.env.SMTP_PASS
 );

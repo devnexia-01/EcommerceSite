@@ -12,8 +12,8 @@ import {
   SystemMetricsCollector 
 } from "./activity-tracker";
 import { seed } from "./seed";
-import { connectToDatabase, db } from "./db";
-import { products } from "@shared/schema";
+import { connectToDatabase } from "./db";
+import { Product } from "./models";
 
 const app = express();
 app.use(express.json());
@@ -69,9 +69,9 @@ app.use((req, res, next) => {
 async function autoSeed() {
   try {
     // Check if database has any products (indicating it's already seeded)
-    const existingProducts = await db.select().from(products).limit(1);
+    const existingProducts = await Product.findOne().limit(1);
     
-    if (existingProducts.length === 0) {
+    if (!existingProducts) {
       log("🌱 Database is empty, running automatic seeding...");
       await seed();
       log("✅ Automatic database seeding completed!");

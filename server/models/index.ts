@@ -31,6 +31,8 @@ export interface IUser extends Document {
 }
 
 const userSchema = new Schema<IUser>({
+  _id: { type: String, required: true },
+  _id: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   username: { type: String, required: true, unique: true },
   passwordHash: { type: String, required: true },
@@ -55,7 +57,7 @@ const userSchema = new Schema<IUser>({
   otpExpiresAt: Date,
   failedOtpAttempts: { type: Number, default: 0 },
   lastLoginAt: Date
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const User = mongoose.model<IUser>('User', userSchema);
 
@@ -79,6 +81,7 @@ export interface ICategory extends Document {
 }
 
 const categorySchema = new Schema<ICategory>({
+  _id: { type: String, required: true },
   name: { type: String, required: true },
   slug: { type: String, required: true, unique: true },
   description: String,
@@ -92,7 +95,7 @@ const categorySchema = new Schema<ICategory>({
     metaDescription: String,
     keywords: [String]
   }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Category = mongoose.model<ICategory>('Category', categorySchema);
 
@@ -109,13 +112,14 @@ export interface IBrand extends Document {
 }
 
 const brandSchema = new Schema<IBrand>({
+  _id: { type: String, required: true },
   name: { type: String, required: true },
   slug: { type: String, required: true, unique: true },
   description: String,
   logo: String,
   website: String,
   status: { type: String, default: 'active' }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Brand = mongoose.model<IBrand>('Brand', brandSchema);
 
@@ -163,6 +167,7 @@ export interface IProduct extends Document {
 }
 
 const productSchema = new Schema<IProduct>({
+  _id: { type: String, required: true },
   sku: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   slug: { type: String, required: true, unique: true },
@@ -200,7 +205,7 @@ const productSchema = new Schema<IProduct>({
   reviewCount: { type: Number, default: 0 },
   status: { type: String, default: 'active' },
   publishedAt: Date
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Product = mongoose.model<IProduct>('Product', productSchema);
 
@@ -224,6 +229,7 @@ export interface IAddress extends Document {
 }
 
 const addressSchema = new Schema<IAddress>({
+  _id: { type: String, required: true },
   userId: { type: String, ref: 'User', required: true },
   type: { type: String, required: true },
   firstName: { type: String, required: true },
@@ -237,7 +243,7 @@ const addressSchema = new Schema<IAddress>({
   country: { type: String, required: true, default: 'US' },
   phoneNumber: String,
   isDefault: { type: Boolean, default: false }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Address = mongoose.model<IAddress>('Address', addressSchema);
 
@@ -259,6 +265,7 @@ export interface ICart extends Document {
 }
 
 const cartSchema = new Schema<ICart>({
+  _id: { type: String, required: true },
   userId: { type: String, ref: 'User' },
   sessionId: String,
   subtotal: { type: Number, default: 0 },
@@ -270,7 +277,7 @@ const cartSchema = new Schema<ICart>({
   notes: String,
   expiresAt: Date,
   abandoned: { type: Boolean, default: false }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Cart = mongoose.model<ICart>('Cart', cartSchema);
 
@@ -297,6 +304,7 @@ export interface ICartItem extends Document {
 }
 
 const cartItemSchema = new Schema<ICartItem>({
+  _id: { type: String, required: true },
   cartId: { type: String, ref: 'Cart', required: true },
   productId: { type: String, ref: 'Product', required: true },
   variantId: String,
@@ -307,7 +315,7 @@ const cartItemSchema = new Schema<ICartItem>({
   savedForLater: { type: Boolean, default: false },
   savedAt: Date,
   addedAt: { type: Date, default: Date.now }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const CartItem = mongoose.model<ICartItem>('CartItem', cartItemSchema);
 
@@ -338,6 +346,7 @@ export interface IOrder extends Document {
 }
 
 const orderSchema = new Schema<IOrder>({
+  _id: { type: String, required: true },
   orderNumber: { type: String, required: true, unique: true },
   userId: { type: String, ref: 'User', required: true },
   status: { type: String, default: 'pending' },
@@ -358,7 +367,7 @@ const orderSchema = new Schema<IOrder>({
   confirmedAt: Date,
   shippedAt: Date,
   deliveredAt: Date
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);
 
@@ -377,6 +386,7 @@ export interface IOrderItem extends Document {
 }
 
 const orderItemSchema = new Schema<IOrderItem>({
+  _id: { type: String, required: true },
   orderId: { type: String, ref: 'Order', required: true },
   productId: { type: String, ref: 'Product', required: true },
   sku: { type: String, required: true },
@@ -407,6 +417,7 @@ export interface IReview extends Document {
 }
 
 const reviewSchema = new Schema<IReview>({
+  _id: { type: String, required: true },
   productId: { type: String, ref: 'Product', required: true },
   userId: { type: String, ref: 'User', required: true },
   orderId: { type: String, ref: 'Order' },
@@ -416,7 +427,7 @@ const reviewSchema = new Schema<IReview>({
   comment: String,
   verified: { type: Boolean, default: false },
   moderationStatus: { type: String, default: 'pending' }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const Review = mongoose.model<IReview>('Review', reviewSchema);
 
@@ -432,12 +443,13 @@ export interface INewsletterSubscription extends Document {
 }
 
 const newsletterSubscriptionSchema = new Schema<INewsletterSubscription>({
+  _id: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   status: { type: String, default: 'pending' }, // pending, confirmed, unsubscribed
   subscriptionToken: String,
   confirmedAt: Date,
   unsubscribedAt: Date
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const NewsletterSubscription = mongoose.model<INewsletterSubscription>('NewsletterSubscription', newsletterSubscriptionSchema);
 
@@ -454,12 +466,470 @@ export interface IUserSettings extends Document {
 }
 
 const userSettingsSchema = new Schema<IUserSettings>({
+  _id: { type: String, required: true },
   userId: { type: String, ref: 'User', required: true, unique: true },
   orderUpdates: { type: Boolean, default: true },
   promotionalEmails: { type: Boolean, default: false },
   productRecommendations: { type: Boolean, default: true },
   securityAlerts: { type: Boolean, default: true },
   newsletterSubscribed: { type: Boolean, default: false }
-}, { timestamps: true });
+}, { _id: false, timestamps: true });
 
 export const UserSettings = mongoose.model<IUserSettings>('UserSettings', userSettingsSchema);
+
+// User Preferences Model
+export interface IUserPreferences extends Document {
+  userId: string;
+  language: string;
+  currency: string;
+  timezone: string;
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  pushNotifications: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const userPreferencesSchema = new Schema<IUserPreferences>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true, unique: true },
+  language: { type: String, default: 'en' },
+  currency: { type: String, default: 'USD' },
+  timezone: { type: String, default: 'UTC' },
+  emailNotifications: { type: Boolean, default: true },
+  smsNotifications: { type: Boolean, default: false },
+  pushNotifications: { type: Boolean, default: true }
+}, { _id: false, timestamps: true });
+
+export const UserPreferences = mongoose.model<IUserPreferences>('UserPreferences', userPreferencesSchema);
+
+// Refresh Token Model
+export interface IRefreshToken extends Document {
+  userId: string;
+  token: string;
+  expiresAt: Date;
+  deviceInfo?: string;
+  ipAddress?: string;
+  createdAt?: Date;
+}
+
+const refreshTokenSchema = new Schema<IRefreshToken>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true },
+  token: { type: String, required: true, unique: true },
+  expiresAt: { type: Date, required: true },
+  deviceInfo: String,
+  ipAddress: String
+}, { _id: false, timestamps: true });
+
+export const RefreshToken = mongoose.model<IRefreshToken>('RefreshToken', refreshTokenSchema);
+
+// Password Reset Token Model
+export interface IPasswordResetToken extends Document {
+  userId: string;
+  token: string;
+  expiresAt: Date;
+  used: boolean;
+  createdAt?: Date;
+}
+
+const passwordResetTokenSchema = new Schema<IPasswordResetToken>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true },
+  token: { type: String, required: true, unique: true },
+  expiresAt: { type: Date, required: true },
+  used: { type: Boolean, default: false }
+}, { _id: false, timestamps: true });
+
+export const PasswordResetToken = mongoose.model<IPasswordResetToken>('PasswordResetToken', passwordResetTokenSchema);
+
+// Login Session Model
+export interface ILoginSession extends Document {
+  userId: string;
+  sessionToken: string;
+  deviceInfo?: string;
+  ipAddress?: string;
+  location?: string;
+  expiresAt: Date;
+  lastActiveAt?: Date;
+  createdAt?: Date;
+}
+
+const loginSessionSchema = new Schema<ILoginSession>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true },
+  sessionToken: { type: String, required: true, unique: true },
+  deviceInfo: String,
+  ipAddress: String,
+  location: String,
+  expiresAt: { type: Date, required: true },
+  lastActiveAt: { type: Date, default: Date.now }
+}, { _id: false, timestamps: true });
+
+export const LoginSession = mongoose.model<ILoginSession>('LoginSession', loginSessionSchema);
+
+// Wishlist Model
+export interface IWishlist extends Document {
+  userId: string;
+  name: string;
+  description?: string;
+  isDefault: boolean;
+  isPublic: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const wishlistSchema = new Schema<IWishlist>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true },
+  name: { type: String, required: true, default: 'My Wishlist' },
+  description: String,
+  isDefault: { type: Boolean, default: true },
+  isPublic: { type: Boolean, default: false }
+}, { _id: false, timestamps: true });
+
+export const Wishlist = mongoose.model<IWishlist>('Wishlist', wishlistSchema);
+
+// Wishlist Item Model
+export interface IWishlistItem extends Document {
+  wishlistId: string;
+  productId: string;
+  addedAt?: Date;
+  notes?: string;
+}
+
+const wishlistItemSchema = new Schema<IWishlistItem>({
+  _id: { type: String, required: true },
+  wishlistId: { type: String, ref: 'Wishlist', required: true },
+  productId: { type: String, ref: 'Product', required: true },
+  addedAt: { type: Date, default: Date.now },
+  notes: String
+});
+
+export const WishlistItem = mongoose.model<IWishlistItem>('WishlistItem', wishlistItemSchema);
+
+// Email Subscription Model
+export interface IEmailSubscription extends Document {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  source?: string;
+  subscriptionToken?: string;
+  confirmed: boolean;
+  confirmedAt?: Date;
+  unsubscribed: boolean;
+  unsubscribedAt?: Date;
+  preferences: any;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const emailSubscriptionSchema = new Schema<IEmailSubscription>({
+  _id: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  firstName: String,
+  lastName: String,
+  source: String,
+  subscriptionToken: String,
+  confirmed: { type: Boolean, default: false },
+  confirmedAt: Date,
+  unsubscribed: { type: Boolean, default: false },
+  unsubscribedAt: Date,
+  preferences: Schema.Types.Mixed
+}, { _id: false, timestamps: true });
+
+export const EmailSubscription = mongoose.model<IEmailSubscription>('EmailSubscription', emailSubscriptionSchema);
+
+// Purchase Intent Model
+export interface IPurchaseIntent extends Document {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+  price: number;
+  sessionId?: string;
+  userId?: string;
+  email?: string;
+  phone?: string;
+  shippingAddress?: any;
+  status: string;
+  expiresAt?: Date;
+  completedAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const purchaseIntentSchema = new Schema<IPurchaseIntent>({
+  _id: { type: String, required: true },
+  productId: { type: String, ref: 'Product', required: true },
+  variantId: String,
+  quantity: { type: Number, required: true },
+  price: { type: Number, required: true },
+  sessionId: String,
+  userId: { type: String, ref: 'User' },
+  email: String,
+  phone: String,
+  shippingAddress: Schema.Types.Mixed,
+  status: { type: String, default: 'pending' },
+  expiresAt: Date,
+  completedAt: Date
+}, { _id: false, timestamps: true });
+
+export const PurchaseIntent = mongoose.model<IPurchaseIntent>('PurchaseIntent', purchaseIntentSchema);
+
+// Admin User Model
+export interface IAdminUser extends Document {
+  userId: string;
+  roleId?: string;
+  permissions: string[];
+  canAccessDashboard: boolean;
+  canManageUsers: boolean;
+  canManageProducts: boolean;
+  canManageOrders: boolean;
+  canManageContent: boolean;
+  canManageSettings: boolean;
+  canViewReports: boolean;
+  canManageRoles: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const adminUserSchema = new Schema<IAdminUser>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true, unique: true },
+  roleId: String,
+  permissions: [String],
+  canAccessDashboard: { type: Boolean, default: true },
+  canManageUsers: { type: Boolean, default: false },
+  canManageProducts: { type: Boolean, default: false },
+  canManageOrders: { type: Boolean, default: false },
+  canManageContent: { type: Boolean, default: false },
+  canManageSettings: { type: Boolean, default: false },
+  canViewReports: { type: Boolean, default: false },
+  canManageRoles: { type: Boolean, default: false }
+}, { _id: false, timestamps: true });
+
+export const AdminUser = mongoose.model<IAdminUser>('AdminUser', adminUserSchema);
+
+// Admin Role Model
+export interface IAdminRole extends Document {
+  name: string;
+  description?: string;
+  permissions: string[];
+  isSystem: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const adminRoleSchema = new Schema<IAdminRole>({
+  _id: { type: String, required: true },
+  name: { type: String, required: true, unique: true },
+  description: String,
+  permissions: [String],
+  isSystem: { type: Boolean, default: false }
+}, { _id: false, timestamps: true });
+
+export const AdminRole = mongoose.model<IAdminRole>('AdminRole', adminRoleSchema);
+
+// System Config Model
+export interface ISystemConfig extends Document {
+  category: string;
+  key: string;
+  value: any;
+  description?: string;
+  updatedBy?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const systemConfigSchema = new Schema<ISystemConfig>({
+  _id: { type: String, required: true },
+  category: { type: String, required: true },
+  key: { type: String, required: true },
+  value: Schema.Types.Mixed,
+  description: String,
+  updatedBy: String
+}, { _id: false, timestamps: true });
+
+systemConfigSchema.index({ category: 1, key: 1 }, { unique: true });
+
+export const SystemConfig = mongoose.model<ISystemConfig>('SystemConfig', systemConfigSchema);
+
+// Audit Log Model
+export interface IAuditLog extends Document {
+  action: string;
+  resource: string;
+  resourceId?: string;
+  actorId?: string;
+  actorType?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  changes?: any;
+  severity?: string;
+  createdAt?: Date;
+}
+
+const auditLogSchema = new Schema<IAuditLog>({
+  _id: { type: String, required: true },
+  action: { type: String, required: true },
+  resource: { type: String, required: true },
+  resourceId: String,
+  actorId: String,
+  actorType: String,
+  ipAddress: String,
+  userAgent: String,
+  changes: Schema.Types.Mixed,
+  severity: { type: String, default: 'info' }
+}, { _id: false, timestamps: true });
+
+export const AuditLog = mongoose.model<IAuditLog>('AuditLog', auditLogSchema);
+
+// Security Log Model
+export interface ISecurityLog extends Document {
+  type: string;
+  severity: string;
+  message: string;
+  userId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: any;
+  resolved: boolean;
+  resolvedBy?: string;
+  resolvedAt?: Date;
+  createdAt?: Date;
+}
+
+const securityLogSchema = new Schema<ISecurityLog>({
+  _id: { type: String, required: true },
+  type: { type: String, required: true },
+  severity: { type: String, required: true },
+  message: { type: String, required: true },
+  userId: String,
+  ipAddress: String,
+  userAgent: String,
+  metadata: Schema.Types.Mixed,
+  resolved: { type: Boolean, default: false },
+  resolvedBy: String,
+  resolvedAt: Date
+}, { _id: false, timestamps: true });
+
+export const SecurityLog = mongoose.model<ISecurityLog>('SecurityLog', securityLogSchema);
+
+// IP Blacklist Model
+export interface IIpBlacklist extends Document {
+  ipAddress: string;
+  reason?: string;
+  createdBy?: string;
+  createdAt?: Date;
+}
+
+const ipBlacklistSchema = new Schema<IIpBlacklist>({
+  _id: { type: String, required: true },
+  ipAddress: { type: String, required: true, unique: true },
+  reason: String,
+  createdBy: String
+}, { _id: false, timestamps: true });
+
+export const IpBlacklist = mongoose.model<IIpBlacklist>('IpBlacklist', ipBlacklistSchema);
+
+// User Activity Model
+export interface IUserActivity extends Document {
+  userId: string;
+  action: string;
+  resource?: string;
+  resourceId?: string;
+  metadata?: any;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt?: Date;
+}
+
+const userActivitySchema = new Schema<IUserActivity>({
+  _id: { type: String, required: true },
+  userId: { type: String, ref: 'User', required: true },
+  action: { type: String, required: true },
+  resource: String,
+  resourceId: String,
+  metadata: Schema.Types.Mixed,
+  ipAddress: String,
+  userAgent: String
+}, { _id: false, timestamps: true });
+
+export const UserActivity = mongoose.model<IUserActivity>('UserActivity', userActivitySchema);
+
+// Content Model
+export interface IContent extends Document {
+  type: string;
+  key: string;
+  title: string;
+  content: string;
+  status: string;
+  publishedAt?: Date;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const contentSchema = new Schema<IContent>({
+  _id: { type: String, required: true },
+  type: { type: String, required: true },
+  key: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  status: { type: String, default: 'draft' },
+  publishedAt: Date,
+  createdBy: String,
+  updatedBy: String
+}, { _id: false, timestamps: true });
+
+export const Content = mongoose.model<IContent>('Content', contentSchema);
+
+// Media Model
+export interface IMedia extends Document {
+  filename: string;
+  originalFilename: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  thumbnailUrl?: string;
+  uploadedBy?: string;
+  createdAt?: Date;
+}
+
+const mediaSchema = new Schema<IMedia>({
+  _id: { type: String, required: true },
+  filename: { type: String, required: true },
+  originalFilename: { type: String, required: true },
+  mimeType: { type: String, required: true },
+  size: { type: Number, required: true },
+  url: { type: String, required: true },
+  thumbnailUrl: String,
+  uploadedBy: String
+}, { _id: false, timestamps: true });
+
+export const Media = mongoose.model<IMedia>('Media', mediaSchema);
+
+// Backup Log Model
+export interface IBackupLog extends Document {
+  type: string;
+  status: string;
+  size?: number;
+  location?: string;
+  error?: string;
+  triggeredBy?: string;
+  createdAt?: Date;
+  completedAt?: Date;
+}
+
+const backupLogSchema = new Schema<IBackupLog>({
+  _id: { type: String, required: true },
+  type: { type: String, required: true },
+  status: { type: String, required: true },
+  size: Number,
+  location: String,
+  error: String,
+  triggeredBy: String,
+  completedAt: Date
+}, { _id: false, timestamps: true });
+
+export const BackupLog = mongoose.model<IBackupLog>('BackupLog', backupLogSchema);
