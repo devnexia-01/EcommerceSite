@@ -126,6 +126,5 @@ async function autoSeed() {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-    log(`real-time monitoring and security features activated`);
   });
 })();
