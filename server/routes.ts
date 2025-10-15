@@ -22,6 +22,9 @@ import { setupOrderManagementRoutes } from "./order-management-service";
 import { setupOTPRoutes } from "./otp-routes";
 import { setupSubscriptionRoutes } from "./subscription-routes";
 import { setupBuyNowRoutes } from "./buy-now-routes";
+import { setupMongoAuthRoutes } from "./auth-mongodb";
+import { setupUserProfileRoutes } from "./user-profile-routes";
+import { setupNewsletterRoutes } from "./newsletter-routes";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { 
@@ -70,17 +73,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup comprehensive authentication routes
   setupAuthRoutes(app);
   
+  // Setup MongoDB-based OTP authentication routes
+  setupMongoAuthRoutes(app);
+  
   // Setup OTP verification routes
   setupOTPRoutes(app);
   
   // Setup email subscription routes
   setupSubscriptionRoutes(app);
   
+  // Setup newsletter routes
+  setupNewsletterRoutes(app);
+  
   // Setup buy now routes
   setupBuyNowRoutes(app);
   
   // Setup user profile management routes
   setupUserRoutes(app);
+  
+  // Setup MongoDB user profile routes
+  setupUserProfileRoutes(app);
   
   // Setup notification routes
   setupNotificationRoutes(app);

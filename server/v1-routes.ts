@@ -5,6 +5,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { productService } from "./product-service";
 import { brandService } from "./brand-service";
+import { sendOrderConfirmation } from "./utils/email";
 import {
   createProductSchema,
   updateProductSchema,
@@ -901,6 +902,36 @@ export function setupV1Routes(app: any, storage: any) {
 
         return newOrder;
       });
+
+      // Send order confirmation email
+      try {
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, userId)
+        });
+        
+        if (user && user.email) {
+          // Fetch order items for email
+          const items = await db.query.orderItems.findMany({
+            where: eq(orderItems.orderId, result.id)
+          });
+          
+          await sendOrderConfirmation(user.email, result.orderNumber, {
+            items: items.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: parseFloat(item.unitPrice)
+            })),
+            subtotal: parseFloat(result.subtotal),
+            shipping: parseFloat(result.shipping || "0"),
+            tax: parseFloat(result.tax || "0"),
+            total: parseFloat(result.total),
+            shippingAddress: result.shippingAddress
+          });
+        }
+      } catch (emailError) {
+        console.error("Error sending order confirmation email:", emailError);
+        // Don't fail the order creation if email fails
+      }
 
       res.status(201).json({
         success: true,

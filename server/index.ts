@@ -12,7 +12,7 @@ import {
   SystemMetricsCollector 
 } from "./activity-tracker";
 import { seed } from "./seed";
-import { db } from "./db";
+import { connectToDatabase, db } from "./db";
 import { products } from "@shared/schema";
 
 const app = express();
@@ -85,6 +85,9 @@ async function autoSeed() {
 }
 
 (async () => {
+  // Connect to MongoDB before starting the server
+  await connectToDatabase();
+  
   // Run automatic seeding before starting the server
   await autoSeed();
   
