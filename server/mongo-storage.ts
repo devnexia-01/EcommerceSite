@@ -275,7 +275,7 @@ export class MongoStorage implements IStorage {
 
   // Purchase Intents methods
   async createPurchaseIntent(intent: any): Promise<any> {
-    const purchaseIntent = await PurchaseIntent.create(intent);
+    const purchaseIntent = await PurchaseIntent.create({ _id: nanoid(), ...intent });
     return toPlainObject(purchaseIntent);
   }
 
@@ -568,10 +568,12 @@ export class MongoStorage implements IStorage {
   }
 
   async createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<OrderType> {
-    const newOrder = await Order.create(order);
-    const orderId = newOrder._id.toString();
+    const orderId = nanoid();
+    const newOrder = await Order.create({ _id: orderId, ...order });
 
-    await OrderItem.insertMany(items.map(item => ({ ...item, orderId })));
+    if (items.length > 0) {
+      await OrderItem.insertMany(items.map(item => ({ _id: nanoid(), ...item, orderId })));
+    }
 
     return toPlainObject(newOrder);
   }
@@ -976,7 +978,7 @@ export class MongoStorage implements IStorage {
 
   // Security Monitoring
   async createSecurityLog(log: InsertSecurityLog): Promise<SecurityLogType> {
-    const securityLog = await SecurityLog.create(log);
+    const securityLog = await SecurityLog.create({ _id: nanoid(), ...log });
     return toPlainObject(securityLog);
   }
 

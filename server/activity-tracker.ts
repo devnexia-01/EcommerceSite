@@ -90,8 +90,8 @@ export const securityMonitor = async (req: AuthenticatedRequest, res: Response, 
         await adminStorage.createSecurityLog({
           type,
           severity,
-          description: `Suspicious ${type} detected`,
-          context: {
+          message: `Suspicious ${type} detected`,
+          metadata: {
             url,
             method: req.method,
             userAgent,
@@ -127,8 +127,8 @@ export const rateLimitMonitor = (req: AuthenticatedRequest, res: Response, next:
       adminStorage.createSecurityLog({
         type: 'rate_limit_exceeded',
         severity: 'medium',
-        description: 'Rate limit exceeded',
-        context: {
+        message: 'Rate limit exceeded',
+        metadata: {
           url: req.originalUrl,
           method: req.method,
           userAgent: req.get('User-Agent'),
@@ -156,8 +156,8 @@ export const loginAttemptMonitor = async (req: Request, res: Response, next: Nex
         adminStorage.createSecurityLog({
           type: 'failed_login',
           severity: 'low',
-          description: 'Failed login attempt',
-          context: {
+          message: 'Failed login attempt',
+          metadata: {
             email: req.body.email,
             userAgent: req.get('User-Agent'),
             ipAddress: req.ip || req.connection.remoteAddress,
@@ -170,8 +170,8 @@ export const loginAttemptMonitor = async (req: Request, res: Response, next: Nex
         adminStorage.createSecurityLog({
           type: 'login_success',
           severity: 'info',
-          description: 'Successful login',
-          context: {
+          message: 'Successful login',
+          metadata: {
             email: req.body.email,
             userAgent: req.get('User-Agent'),
             ipAddress: req.ip || req.connection.remoteAddress,

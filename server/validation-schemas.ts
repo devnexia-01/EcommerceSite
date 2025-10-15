@@ -12,8 +12,8 @@ export const createProductSchema = z.object({
   salePrice: z.number().positive().optional(),
   currency: z.string().default("USD"),
   taxRate: z.number().min(0).max(1).default(0),
-  categoryId: z.string().uuid().optional(),
-  brandId: z.string().uuid().optional(),
+  categoryId: z.string().optional(),
+  brandId: z.string().optional(),
   stock: z.number().int().min(0).default(0),
   attributes: z.record(z.any()).default({}),
   seo: z.object({
@@ -31,8 +31,8 @@ export const updateProductSchema = createProductSchema.partial();
 export const productSearchSchema = z.object({
   query: z.string().optional(),
   search: z.string().optional(), // Accept both search and query for compatibility
-  categoryId: z.string().uuid().optional(),
-  brandId: z.string().uuid().optional(),
+  categoryId: z.string().optional(),
+  brandId: z.string().optional(),
   minPrice: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val).optional(),
   maxPrice: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val).optional(),
   attributes: z.record(z.any()).optional(),
@@ -102,7 +102,7 @@ export const createCategorySchema = z.object({
   name: z.string().min(1, "Category name is required"),
   slug: z.string().optional(),
   description: z.string().optional(),
-  parentId: z.string().uuid().optional(),
+  parentId: z.string().optional(),
   imageUrl: z.string().url().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
   sortOrder: z.number().int().min(0).default(0)
@@ -112,7 +112,7 @@ export const updateCategorySchema = createCategorySchema.partial();
 
 export const categorySearchSchema = z.object({
   search: z.string().optional(),
-  parentId: z.string().uuid().optional(),
+  parentId: z.string().optional(),
   status: z.enum(['active', 'inactive']).optional(),
   sortBy: z.enum(['name', 'sortOrder', 'created']).default('sortOrder'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
