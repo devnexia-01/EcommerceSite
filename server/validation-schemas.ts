@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// MongoDB ID schema - accepts any non-empty string
+export const mongoIdSchema = z.string().min(1, "ID is required");
+
 // Product schemas
 export const createProductSchema = z.object({
   sku: z.string().min(1, "SKU is required"),

@@ -19,24 +19,14 @@ import {
   createCategorySchema,
   updateCategorySchema,
   categorySearchSchema,
-  uuidSchema,
+  mongoIdSchema,
   formatValidationError
 } from "./validation-schemas";
 import { z } from "zod";
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from "./auth-routes";
 import { nanoid } from "nanoid";
-import { 
-  orders, orderItems, returns, returnItems, invoices, invoiceLineItems,
-  tracking, trackingEvents, orderStatusHistory, shipments, shipmentItems,
-  reviews, products, users
-} from "@shared/schema";
-import { 
-  insertOrderSchema, insertOrderItemSchema, insertReturnSchema, insertReturnItemSchema,
-  insertInvoiceSchema, insertInvoiceLineItemSchema, insertTrackingSchema, 
-  insertTrackingEventSchema, insertOrderStatusHistorySchema, insertShipmentSchema,
-  insertShipmentItemSchema, insertReviewSchema
-} from "@shared/schema";
-import { eq, desc, and, sql, or } from "drizzle-orm";
+// Note: These Drizzle ORM imports are kept for type compatibility but not used for queries
+// The application uses MongoDB storage instead
 
 export function setupV1Routes(app: any, storage: any) {
   
@@ -211,7 +201,7 @@ export function setupV1Routes(app: any, storage: any) {
   // PUT /api/v1/products/:productId
   app.put("/api/v1/products/:productId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
+      const productId = mongoIdSchema.parse(req.params.productId);
       const validatedData = updateProductSchema.parse(req.body);
       
       const product = await productService.updateProduct(productId, validatedData);
@@ -248,7 +238,7 @@ export function setupV1Routes(app: any, storage: any) {
   // DELETE /api/v1/products/:productId
   app.delete("/api/v1/products/:productId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
+      const productId = mongoIdSchema.parse(req.params.productId);
       await storage.deleteProductV1(productId);
 
       res.json({
@@ -274,7 +264,7 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/products/:productId/variants
   app.get("/api/v1/products/:productId/variants", async (req: Request, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
+      const productId = mongoIdSchema.parse(req.params.productId);
       const variants = await productService.getProductVariants(productId);
 
       res.json({
@@ -302,7 +292,7 @@ export function setupV1Routes(app: any, storage: any) {
   // POST /api/v1/products/:productId/variants
   app.post("/api/v1/products/:productId/variants", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
+      const productId = mongoIdSchema.parse(req.params.productId);
       const validatedData = createVariantSchema.parse(req.body);
       
       const variant = await productService.createProductVariant(productId, validatedData);
@@ -339,7 +329,7 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/products/:productId/media
   app.get("/api/v1/products/:productId/media", async (req: Request, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
+      const productId = mongoIdSchema.parse(req.params.productId);
       const media = await productService.getProductMedia(productId);
 
       res.json({
@@ -367,7 +357,7 @@ export function setupV1Routes(app: any, storage: any) {
   // POST /api/v1/products/:productId/media
   app.post("/api/v1/products/:productId/media", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
+      const productId = mongoIdSchema.parse(req.params.productId);
       const validatedData = addMediaSchema.parse(req.body);
       
       const media = await productService.addProductMedia(productId, validatedData);
@@ -425,7 +415,7 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/brands/:brandId
   app.get("/api/v1/brands/:brandId", async (req: Request, res: Response) => {
     try {
-      const brandId = uuidSchema.parse(req.params.brandId);
+      const brandId = mongoIdSchema.parse(req.params.brandId);
       const brand = await brandService.getBrandById(brandId);
 
       if (!brand) {
@@ -495,7 +485,7 @@ export function setupV1Routes(app: any, storage: any) {
   // PUT /api/v1/brands/:brandId
   app.put("/api/v1/brands/:brandId", async (req: Request, res: Response) => {
     try {
-      const brandId = uuidSchema.parse(req.params.brandId);
+      const brandId = mongoIdSchema.parse(req.params.brandId);
       const validatedData = updateBrandSchema.parse(req.body);
       
       const brand = await brandService.updateBrand(brandId, validatedData);
@@ -532,7 +522,7 @@ export function setupV1Routes(app: any, storage: any) {
   // DELETE /api/v1/brands/:brandId
   app.delete("/api/v1/brands/:brandId", async (req: Request, res: Response) => {
     try {
-      const brandId = uuidSchema.parse(req.params.brandId);
+      const brandId = mongoIdSchema.parse(req.params.brandId);
       await brandService.deleteBrand(brandId);
 
       res.json({
@@ -565,7 +555,7 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/brands/:brandId/products
   app.get("/api/v1/brands/:brandId/products", async (req: Request, res: Response) => {
     try {
-      const brandId = uuidSchema.parse(req.params.brandId);
+      const brandId = mongoIdSchema.parse(req.params.brandId);
       const { limit = "20", offset = "0", sortBy = "created", sortOrder = "desc" } = req.query as Record<string, string>;
       
       const result = await brandService.getBrandProducts(brandId, {
@@ -642,7 +632,7 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/categories/:categoryId
   app.get("/api/v1/categories/:categoryId", async (req: Request, res: Response) => {
     try {
-      const categoryId = uuidSchema.parse(req.params.categoryId);
+      const categoryId = mongoIdSchema.parse(req.params.categoryId);
       const category = await storage.getCategoryByIdV1(categoryId);
       
       if (!category) {
@@ -705,7 +695,7 @@ export function setupV1Routes(app: any, storage: any) {
   // PUT /api/v1/categories/:categoryId
   app.put("/api/v1/categories/:categoryId", async (req: Request, res: Response) => {
     try {
-      const categoryId = uuidSchema.parse(req.params.categoryId);
+      const categoryId = mongoIdSchema.parse(req.params.categoryId);
       const validatedData = updateCategorySchema.parse(req.body);
       const category = await storage.updateCategoryV1(categoryId, validatedData);
 
@@ -734,7 +724,7 @@ export function setupV1Routes(app: any, storage: any) {
   // DELETE /api/v1/categories/:categoryId
   app.delete("/api/v1/categories/:categoryId", async (req: Request, res: Response) => {
     try {
-      const categoryId = uuidSchema.parse(req.params.categoryId);
+      const categoryId = mongoIdSchema.parse(req.params.categoryId);
       await storage.deleteCategoryV1(categoryId);
 
       res.json({
@@ -760,7 +750,7 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/categories/:categoryId/products
   app.get("/api/v1/categories/:categoryId/products", async (req: Request, res: Response) => {
     try {
-      const categoryId = uuidSchema.parse(req.params.categoryId);
+      const categoryId = mongoIdSchema.parse(req.params.categoryId);
       const { limit = "20", offset = "0", sortBy = "created", sortOrder = "desc" } = req.query as Record<string, string>;
       
       const result = await storage.getProductsByCategoryV1(categoryId, {
