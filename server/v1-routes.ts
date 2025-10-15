@@ -74,7 +74,13 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/products/filters (must be before /:productId)
   app.get("/api/v1/products/filters", async (req: Request, res: Response) => {
     try {
-      const filters = await productService.getProductFilters();
+      // Return empty filters for now since MongoDB doesn't have the advanced filter system
+      const filters = {
+        categories: [],
+        brands: [],
+        priceRange: { min: 0, max: 1000 },
+        attributes: {}
+      };
 
       res.json({
         success: true,
@@ -95,11 +101,26 @@ export function setupV1Routes(app: any, storage: any) {
   app.get("/api/v1/products", async (req: Request, res: Response) => {
     try {
       const validatedQuery = productSearchSchema.parse(req.query);
-      const result = await productService.searchProducts(validatedQuery);
+      const result = await storage.getProducts({
+        search: validatedQuery.query,
+        categoryId: validatedQuery.categoryId,
+        sortBy: validatedQuery.sortBy,
+        sortOrder: validatedQuery.sortOrder,
+        limit: validatedQuery.limit,
+        offset: validatedQuery.offset
+      });
 
       res.json({
         success: true,
-        data: result
+        data: {
+          products: result.products,
+          total: result.total,
+          pagination: {
+            limit: validatedQuery.limit,
+            offset: validatedQuery.offset,
+            hasMore: result.total > validatedQuery.offset + validatedQuery.limit
+          }
+        }
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -120,8 +141,8 @@ export function setupV1Routes(app: any, storage: any) {
   // GET /api/v1/products/:productId
   app.get("/api/v1/products/:productId", async (req: Request, res: Response) => {
     try {
-      const productId = uuidSchema.parse(req.params.productId);
-      const product = await productService.getProductWithDetails(productId);
+      const productId = req.params.productId; // Accept any string ID for MongoDB
+      const product = await storage.getProduct(productId);
 
       if (!product) {
         return res.status(404).json({
@@ -842,78 +863,58 @@ export function setupV1Routes(app: any, storage: any) {
         }
       };
 
-      const orderData = insertOrderSchema.parse({
+      const orderData: any = {
         userId,
         orderNumber: generateOrderNumber(),
-        subtotal: cleanedBody.subtotal,
-        total: cleanedBody.total,
-        currency: cleanedBody.currency,
-        status: cleanedBody.status,
+        subtotal: cleanedBody.subtotal?.toString() || "0",
+        total: cleanedBody.total?.toString() || "0",
+        shipping: cleanedBody.shipping?.toString() || "0",
+        tax: cleanedBody.tax?.toString() || "0",
+        currency: cleanedBody.currency || "USD",
+        status: cleanedBody.status || "pending",
         paymentMethod: cleanedBody.paymentMethod,
-        paymentStatus: cleanedBody.paymentStatus,
+        paymentStatus: cleanedBody.paymentStatus || "pending",
         notes: cleanedBody.notes,
         shippingAddress: cleanedBody.shippingAddress,
         billingAddress: cleanedBody.billingAddress
-      });
+      };
 
-      // Start transaction for order creation
-      const result = await db.transaction(async (tx) => {
-        // Create order
-        const [newOrder] = await tx.insert(orders).values([orderData]).returning();
-        
-        // Create order items if provided
-        if (req.body.items && Array.isArray(req.body.items)) {
-          for (const item of req.body.items) {
-            // Get product details for order item
-            const productResult = await tx.select().from(products).where(eq(products.id, item.productId));
-            const product = productResult[0];
-            
-            if (!product) {
-              throw new Error(`Product not found: ${item.productId}`);
-            }
-            
-            const unitPrice = parseFloat(item.price);
-            const totalPrice = unitPrice * item.quantity;
-            
-            await tx.insert(orderItems).values({
-              orderId: newOrder.id,
-              productId: item.productId,
-              sku: product.sku || `SKU-${Date.now()}-${item.productId.slice(-8)}`,
-              name: product.name || 'Product',
-              description: product.description || null,
-              quantity: item.quantity,
-              unitPrice: unitPrice.toFixed(2),
-              totalPrice: totalPrice.toFixed(2),
-              price: unitPrice.toFixed(2),
-              total: totalPrice.toFixed(2),
-              status: "pending"
-            });
+      // Prepare order items if provided
+      const items: any[] = [];
+      if (req.body.items && Array.isArray(req.body.items)) {
+        for (const item of req.body.items) {
+          // Get product details for order item
+          const product = await storage.getProduct(item.productId);
+          
+          if (!product) {
+            throw new Error(`Product not found: ${item.productId}`);
           }
+          
+          const unitPrice = parseFloat(item.price);
+          const totalPrice = unitPrice * item.quantity;
+          
+          items.push({
+            productId: item.productId,
+            sku: product.sku || `SKU-${Date.now()}-${item.productId.slice(-8)}`,
+            name: product.name || 'Product',
+            description: product.description || null,
+            quantity: item.quantity,
+            unitPrice: unitPrice.toFixed(2),
+            totalPrice: totalPrice.toFixed(2),
+            price: unitPrice.toFixed(2),
+            total: totalPrice.toFixed(2)
+          });
         }
+      }
 
-        // Create initial status history
-        await tx.insert(orderStatusHistory).values([{
-          orderId: newOrder.id,
-          toStatus: orderData.status || "pending",
-          timestamp: new Date(),
-          notes: "Order created"
-        }]);
+      // Create order using storage
+      const result = await storage.createOrder(orderData, items);
 
-        return newOrder;
-      });
-
-      // Send order confirmation email
+      // Send order confirmation email (optional, can fail silently)
       try {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, userId)
-        });
+        const user = await storage.getUser(userId);
         
         if (user && user.email) {
-          // Fetch order items for email
-          const items = await db.query.orderItems.findMany({
-            where: eq(orderItems.orderId, result.id)
-          });
-          
           await sendOrderConfirmation(user.email, result.orderNumber, {
             items: items.map(item => ({
               name: item.name,
