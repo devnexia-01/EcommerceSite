@@ -10,6 +10,36 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 15, 2025 - Critical Bug Fixes and Database Integration
+- **Issues Fixed**: Multiple critical errors affecting COD payments, buy-now feature, admin product management, and wishlist functionality
+- **Root Cause**: Missing database connection setup for Drizzle ORM services and validation schema issues
+- **Changes Made**:
+  - **Database Connection Setup**:
+    - Created `server/drizzle.ts` with proper Neon serverless PostgreSQL configuration
+    - Added `db` import to `payment-service.ts`, `brand-service.ts`, `product-service.ts`, and `wishlist-routes.ts`
+    - Implemented fail-fast error handling when DATABASE_URL is not configured
+  - **COD Payment Fix**:
+    - Fixed "db is not defined" error by importing database connection
+    - COD payment processing now works correctly for authenticated users
+  - **Buy-Now Security Enhancement**:
+    - Fixed access denied error with strict ownership validation
+    - Requires exact userId OR sessionId match (prevents session hijacking)
+    - Removed sensitive session logging to prevent credential leakage
+  - **Admin Product Form Fix**:
+    - Extended `insertProductSchema` to accept any string for categoryId/brandId
+    - Removed strict UUID validation that was rejecting MongoDB string IDs
+    - Admin can now add products without UUID validation errors
+  - **Wishlist API Restoration**:
+    - Added missing `db` import to wishlist-routes.ts
+    - Enabled wishlist routes in server/routes.ts (previously disabled)
+    - Wishlist endpoints now return proper JSON instead of HTML error pages
+- **Security Improvements**:
+  - Strict ownership checks prevent unauthorized access to purchase intents
+  - No sensitive credentials logged to server logs
+  - Database connection fails fast with clear error messages
+- **Technical Details**: The application uses both MongoDB (via Mongoose) and PostgreSQL (via Drizzle ORM). The Drizzle-based services (payment, brand, product, wishlist) were missing the database connection setup, causing runtime errors. The buy-now routes had a security vulnerability allowing any logged-in user to access guest purchase intents.
+- **User Impact**: All reported features now work correctly - COD payments process successfully, buy-now feature allows secure guest/authenticated flows, admin can add products, and wishlists function properly.
+
 ### October 12, 2025 - Buy Now Authentication Fix
 - **Issue Fixed**: "Failed to create purchase intent" error when users tried to use the Buy Now feature
 - **Root Cause**: Buy-now routes were using JWT token authentication (`authenticateToken`) but the frontend uses session-based authentication with cookies
