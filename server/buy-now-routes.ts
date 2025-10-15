@@ -100,8 +100,8 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Get purchase intent details - requires authentication
-  app.get('/api/buy-now/intent/:intentId', requireSessionAuth, async (req: Request, res: Response) => {
+  // Get purchase intent details - supports both authenticated users and guests
+  app.get('/api/buy-now/intent/:intentId', async (req: Request, res: Response) => {
     try {
       const { intentId } = req.params;
       
@@ -114,8 +114,13 @@ export function setupBuyNowRoutes(app: Express) {
         return res.status(404).json({ message: 'Purchase intent not found' });
       }
 
-      // Verify ownership - user can only access their own purchase intents
-      if (intent.userId !== req.session.userId!) {
+      // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
+      const userId = req.session?.userId;
+      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      
+      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      
+      if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
@@ -160,8 +165,8 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Save shipping address to purchase intent - requires authentication
-  app.post('/api/buy-now/intent/:intentId/address', requireSessionAuth, async (req: Request, res: Response) => {
+  // Save shipping address to purchase intent - supports both authenticated users and guests
+  app.post('/api/buy-now/intent/:intentId/address', async (req: Request, res: Response) => {
     try {
       const { intentId } = req.params;
       const { shippingAddress, email, phone } = req.body;
@@ -179,8 +184,13 @@ export function setupBuyNowRoutes(app: Express) {
         return res.status(404).json({ message: 'Purchase intent not found' });
       }
 
-      // Verify ownership - user can only update their own purchase intents
-      if (intent.userId !== req.session.userId!) {
+      // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
+      const userId = req.session?.userId;
+      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      
+      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      
+      if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
@@ -204,8 +214,8 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Complete purchase intent (convert to order) - requires authentication
-  app.post('/api/buy-now/complete', requireSessionAuth, async (req: Request, res: Response) => {
+  // Complete purchase intent (convert to order) - supports both authenticated users and guests
+  app.post('/api/buy-now/complete', async (req: Request, res: Response) => {
     try {
       const { intentId, paymentMethod } = completePurchaseIntentSchema.parse(req.body);
 
@@ -214,9 +224,22 @@ export function setupBuyNowRoutes(app: Express) {
         return res.status(404).json({ message: 'Purchase intent not found' });
       }
 
-      // Verify ownership - user can only complete their own purchase intents
-      if (intent.userId !== req.session.userId!) {
+      // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
+      const userId = req.session?.userId;
+      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      
+      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      
+      if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
+      }
+      
+      // For guest users, require authentication before completing purchase
+      if (!userId) {
+        return res.status(401).json({ 
+          message: 'Please log in or create an account to complete your purchase',
+          requiresAuth: true 
+        });
       }
 
       // Check if intent is expired
@@ -321,8 +344,8 @@ export function setupBuyNowRoutes(app: Express) {
     }
   });
 
-  // Cancel purchase intent - requires authentication
-  app.post('/api/buy-now/cancel/:intentId', requireSessionAuth, async (req: Request, res: Response) => {
+  // Cancel purchase intent - supports both authenticated users and guests
+  app.post('/api/buy-now/cancel/:intentId', async (req: Request, res: Response) => {
     try {
       const { intentId } = req.params;
       
@@ -331,8 +354,13 @@ export function setupBuyNowRoutes(app: Express) {
         return res.status(404).json({ message: 'Purchase intent not found' });
       }
 
-      // Verify ownership - user can only cancel their own purchase intents
-      if (intent.userId !== req.session.userId!) {
+      // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
+      const userId = req.session?.userId;
+      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      
+      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      
+      if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
