@@ -124,6 +124,7 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
+  deleteProductV1(id: string): Promise<void>;
   updateProductStock(id: string, quantity: number): Promise<void>;
   
   // Addresses

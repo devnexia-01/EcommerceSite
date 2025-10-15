@@ -240,8 +240,9 @@ export function setupBuyNowRoutes(app: Express) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
       
-      // For guest users, require authentication before completing purchase
-      if (!userId) {
+      // For guest users, require authentication for non-COD payment methods
+      // COD (Cash on Delivery) allows guest checkout
+      if (!userId && paymentMethod !== 'cod') {
         return res.status(401).json({ 
           message: 'Please log in or create an account to complete your purchase',
           requiresAuth: true 

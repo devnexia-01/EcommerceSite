@@ -454,6 +454,10 @@ export class MongoStorage implements IStorage {
     await Product.findByIdAndDelete(id);
   }
 
+  async deleteProductV1(id: string): Promise<void> {
+    await Product.findByIdAndDelete(id);
+  }
+
   async updateProductStock(id: string, quantity: number): Promise<void> {
     await Product.findByIdAndUpdate(id, { $inc: { stock: quantity } });
   }
