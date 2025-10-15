@@ -3,15 +3,56 @@ import { z } from 'zod';
 import { adminStorage } from './admin-storage';
 import { storage } from './storage';
 import { authenticateToken, requireAdmin } from './auth-routes';
-import { 
-  createAdminUserSchema,
-  updateUserStatusSchema,
-  bulkUserOperationSchema,
-  systemConfigUpdateSchema,
-  insertAdminRoleSchema,
-  insertContentSchema,
-  insertMediaSchema
-} from '@shared/schema';
+
+// Define admin schemas locally since they're not in @shared/schema
+const createAdminUserSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  username: z.string().min(3, 'Username must be at least 3 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  role: z.string(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional()
+});
+
+const updateUserStatusSchema = z.object({
+  status: z.enum(['active', 'suspended', 'banned', 'inactive']),
+  reason: z.string().optional()
+});
+
+const bulkUserOperationSchema = z.object({
+  userIds: z.array(z.string()),
+  operation: z.enum(['suspend', 'unsuspend', 'ban', 'delete']),
+  reason: z.string().optional()
+});
+
+const systemConfigUpdateSchema = z.object({
+  key: z.string(),
+  value: z.any(),
+  description: z.string().optional()
+});
+
+const insertAdminRoleSchema = z.object({
+  name: z.string().min(1, 'Role name is required'),
+  description: z.string().optional(),
+  permissions: z.array(z.string()).optional()
+});
+
+const insertContentSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  slug: z.string().min(1, 'Slug is required'),
+  type: z.enum(['page', 'post', 'announcement']),
+  content: z.string(),
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
+  authorId: z.string()
+});
+
+const insertMediaSchema = z.object({
+  filename: z.string().min(1, 'Filename is required'),
+  type: z.enum(['image', 'video', 'document']),
+  url: z.string().url('Invalid URL'),
+  size: z.number().min(0),
+  uploadedBy: z.string()
+});
 
 // Enhanced request interface with user data
 interface AuthenticatedRequest extends Request {

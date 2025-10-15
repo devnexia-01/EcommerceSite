@@ -1,6 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { orders, orderItems, products, users, paymentTransactions, refunds, returns, tracking, trackingEvents, invoices, invoiceLineItems } from "@shared/schema";
-import { eq, desc, and, or } from "drizzle-orm";
+import { Order, OrderItem, Product, User } from "./models/index";
 import { authenticateToken } from "./auth-routes";
 import { z } from "zod";
 import { nanoid } from "nanoid";
@@ -100,7 +99,8 @@ export function setupOrderManagementRoutes(app: Express): void {
       const orderNumber = `ORD-${Date.now()}-${nanoid(6).toUpperCase()}`;
 
       // Create order
-      const [newOrder] = await db.insert(orders).values({
+      const newOrder = await Order.create({
+        _id: `ord_${nanoid()}`,
         orderNumber,
         userId,
         status: "pending",
@@ -113,13 +113,13 @@ export function setupOrderManagementRoutes(app: Express): void {
         total: total.toFixed(2),
         shippingAddress: orderData.shippingAddress,
         billingAddress: orderData.billingAddress,
-        shippingMethod: orderData.shippingMethod || "standard"
-      }).returning();
+        shippingMethod: orderData.shippingMethod || "standard",
+        paymentStatus: "pending"
+      });
 
       // Create order items
       for (const item of orderData.items) {
-        // Get product details for order item
-        const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+        const product = await Product.findById(item.productId).lean();
         
         if (!product) {
           throw new Error(`Product not found: ${item.productId}`);
@@ -128,68 +128,27 @@ export function setupOrderManagementRoutes(app: Express): void {
         const unitPrice = parseFloat(item.price);
         const totalPrice = (unitPrice * item.quantity).toFixed(2);
         
-        await db.insert(orderItems).values({
-          orderId: newOrder.id,
+        await OrderItem.create({
+          _id: `oi_${nanoid()}`,
+          orderId: newOrder._id.toString(),
           productId: item.productId,
           sku: product.sku || `SKU-${Date.now()}-${item.productId.slice(-8)}`,
           name: product.name || 'Product',
-          description: product.description || null,
+          description: product.description || undefined,
           quantity: item.quantity,
           unitPrice: unitPrice.toFixed(2),
           totalPrice: totalPrice,
           price: unitPrice.toFixed(2),
-          total: totalPrice,
-          status: "pending"
+          total: totalPrice
         });
       }
 
-      // Create invoice
-      await db.insert(invoices).values({
-        orderId: newOrder.id,
-        userId: newOrder.userId,
-        invoiceNumber: `INV-${newOrder.orderNumber}`,
-        status: "draft",
-        currency: orderData.currency,
-        customerInfo: {
-          name: `${orderData.billingAddress.firstName} ${orderData.billingAddress.lastName}`,
-          email: req.user?.email || 'customer@example.com',
-          address: {
-            streetAddress: orderData.billingAddress.streetAddress,
-            city: orderData.billingAddress.city,
-            state: orderData.billingAddress.state,
-            zipCode: orderData.billingAddress.zipCode,
-            country: orderData.billingAddress.country
-          }
-        },
-        merchantInfo: {
-          name: "Your Store",
-          address: {
-            streetAddress: "123 Business St",
-            city: "Business City",
-            state: "CA",
-            zipCode: "90210",
-            country: "US"
-          }
-        },
-        subtotal: subtotal.toFixed(2),
-        taxTotal: tax.toFixed(2),
-        shippingTotal: shipping.toFixed(2),
-        grandTotal: total.toFixed(2)
-      });
+      // NOTE: Invoice creation would go here but Invoice model doesn't exist yet
 
-      // Return order with items
-      const orderWithItems = await db.query.orders.findFirst({
-        where: eq(orders.id, newOrder.id),
-        with: {
-          orderItems: {
-            with: {
-              product: true
-            }
-          }
-        }
+      res.status(201).json({
+        id: newOrder._id.toString(),
+        ...newOrder.toObject()
       });
-
-      res.status(201).json(orderWithItems);
     } catch (error: any) {
       console.error("Error creating order:", error);
       res.status(400).json({ error: error.message || "Failed to create order" });
@@ -203,16 +162,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       const userId = req.user?.userId || req.user?.id;
       const isAdmin = req.user?.isAdmin;
 
-      const order = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId),
-        with: {
-          orderItems: {
-            with: {
-              product: true
-            }
-          }
-        }
-      });
+      const order = await Order.findById(orderId).lean();
 
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
@@ -223,7 +173,24 @@ export function setupOrderManagementRoutes(app: Express): void {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      res.json(order);
+      // Get order items with product details
+      const orderItems = await OrderItem.find({ orderId }).lean();
+      const itemsWithProducts = await Promise.all(
+        orderItems.map(async (item) => {
+          const product = await Product.findById(item.productId).lean();
+          return {
+            ...item,
+            id: item._id.toString(),
+            product: product ? { id: product._id.toString(), ...product } : null
+          };
+        })
+      );
+
+      res.json({
+        id: order._id.toString(),
+        ...order,
+        orderItems: itemsWithProducts
+      });
     } catch (error: any) {
       console.error("Error fetching order:", error);
       res.status(500).json({ error: "Failed to fetch order" });
@@ -245,23 +212,27 @@ export function setupOrderManagementRoutes(app: Express): void {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      const userOrders = await db.query.orders.findMany({
-        where: eq(orders.userId, targetUserId),
-        with: {
-          orderItems: {
-            with: {
-              product: true
-            }
-          }
-        },
-        orderBy: desc(orders.createdAt),
-        limit,
-        offset
-      });
+      const userOrders = await Order.find({ userId: targetUserId })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .skip(offset)
+        .lean();
+
+      // Get order items for each order
+      const ordersWithItems = await Promise.all(
+        userOrders.map(async (order) => {
+          const orderItems = await OrderItem.find({ orderId: order._id.toString() }).lean();
+          return {
+            id: order._id.toString(),
+            ...order,
+            orderItems: orderItems.map(item => ({ id: item._id.toString(), ...item }))
+          };
+        })
+      );
 
       res.json({
-        orders: userOrders,
-        total: userOrders.length
+        orders: ordersWithItems,
+        total: ordersWithItems.length
       });
     } catch (error: any) {
       console.error("Error fetching user orders:", error);
@@ -273,7 +244,6 @@ export function setupOrderManagementRoutes(app: Express): void {
   app.put("/api/v1/orders/:orderId/status", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { orderId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
       const isAdmin = req.user?.isAdmin;
       
       const updateData = updateOrderStatusSchema.parse(req.body);
@@ -283,52 +253,32 @@ export function setupOrderManagementRoutes(app: Express): void {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const existingOrder = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId)
-      });
+      const existingOrder = await Order.findById(orderId);
 
       if (!existingOrder) {
         return res.status(404).json({ error: "Order not found" });
       }
 
       // Update order status
-      const [updatedOrder] = await db.update(orders)
-        .set({
-          status: updateData.status,
-          updatedAt: new Date()
-        })
-        .where(eq(orders.id, orderId))
-        .returning();
+      const updateFields: any = { status: updateData.status };
+      
+      if (updateData.status === 'confirmed') updateFields.confirmedAt = new Date();
+      if (updateData.status === 'shipped') updateFields.shippedAt = new Date();
+      if (updateData.status === 'delivered') updateFields.deliveredAt = new Date();
+      if (updateData.trackingNumber) updateFields.trackingNumber = updateData.trackingNumber;
 
-      // If status is shipped and tracking number provided, create tracking
-      if (updateData.status === "shipped" && updateData.trackingNumber) {
-        await db.insert(tracking).values({
-          orderId,
-          trackingNumber: updateData.trackingNumber,
-          carrier: "ups", // Default carrier
-          status: "in_transit",
-          estimatedDeliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days from now
-        });
+      const updatedOrder = await Order.findByIdAndUpdate(
+        orderId,
+        { $set: updateFields },
+        { new: true }
+      );
 
-        // Add tracking event
-        const [trackingRecord] = await db.select().from(tracking).where(eq(tracking.orderId, orderId));
-        if (trackingRecord) {
-          await db.insert(trackingEvents).values({
-            trackingId: trackingRecord.id,
-            status: "shipped",
-            description: "Package has been shipped",
-            location: {
-              city: "Fulfillment",
-              state: "CA",
-              country: "US",
-              facility: "Fulfillment Center"
-            },
-            timestamp: new Date()
-          });
-        }
-      }
+      // NOTE: Tracking creation would go here but Tracking model doesn't exist yet
 
-      res.json(updatedOrder);
+      res.json({
+        id: updatedOrder!._id.toString(),
+        ...updatedOrder!.toObject()
+      });
     } catch (error: any) {
       console.error("Error updating order status:", error);
       res.status(400).json({ error: error.message || "Failed to update order status" });
@@ -344,9 +294,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       
       const cancelData = cancelOrderSchema.parse(req.body);
 
-      const order = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId)
-      });
+      const order = await Order.findById(orderId);
 
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
@@ -363,23 +311,20 @@ export function setupOrderManagementRoutes(app: Express): void {
       }
 
       // Update order status to cancelled
-      const [cancelledOrder] = await db.update(orders)
-        .set({
-          status: "cancelled",
-          updatedAt: new Date()
-        })
-        .where(eq(orders.id, orderId))
-        .returning();
+      const cancelledOrder = await Order.findByIdAndUpdate(
+        orderId,
+        { $set: { status: "cancelled" } },
+        { new: true }
+      );
 
-      // If refund amount specified, create refund record
-      if (cancelData.refundAmount) {
-        // This would typically integrate with payment gateway
-        console.log(`Refund of ${cancelData.refundAmount} initiated for order ${order.orderNumber}`);
-      }
+      // NOTE: Refund creation would go here but Refund model doesn't exist yet
 
       res.json({
         message: "Order cancelled successfully",
-        order: cancelledOrder,
+        order: {
+          id: cancelledOrder!._id.toString(),
+          ...cancelledOrder!.toObject()
+        },
         reason: cancelData.reason
       });
     } catch (error: any) {
@@ -396,12 +341,7 @@ export function setupOrderManagementRoutes(app: Express): void {
       
       const returnData = returnOrderSchema.parse(req.body);
 
-      const order = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId),
-        with: {
-          orderItems: true
-        }
-      });
+      const order = await Order.findById(orderId).lean();
 
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
@@ -417,33 +357,10 @@ export function setupOrderManagementRoutes(app: Express): void {
         return res.status(400).json({ error: "Order is not eligible for return" });
       }
 
-      // Generate return number
-      const returnNumber = `RET-${Date.now()}-${nanoid(6).toUpperCase()}`;
-
-      // Create return record
-      const [returnRecord] = await db.insert(returns).values({
-        orderId,
-        userId: userId || '',
-        returnNumber,
-        status: "requested",
-        reason: returnData.reason,
-        type: returnData.returnType,
-        customerNotes: returnData.notes
-      }).returning();
-
-      // Calculate return amount
-      let returnAmount = 0;
-      for (const item of returnData.items) {
-        const orderItem = order.orderItems.find(oi => oi.id === item.orderItemId);
-        if (orderItem) {
-          returnAmount += parseFloat(orderItem.price) * item.quantity;
-        }
-      }
-
-      res.status(201).json({
-        message: "Return request created successfully",
-        return: returnRecord,
-        returnAmount: returnAmount.toFixed(2)
+      // NOTE: Return creation would go here but Return model doesn't exist yet
+      // For now, just return a placeholder response
+      res.status(501).json({
+        error: "Return functionality not yet implemented - Return model needs to be created"
       });
     } catch (error: any) {
       console.error("Error creating return request:", error);
@@ -454,35 +371,9 @@ export function setupOrderManagementRoutes(app: Express): void {
   // GET /api/v1/orders/{orderId}/invoice - Get order invoice
   app.get("/api/v1/orders/:orderId/invoice", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { orderId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
-      const isAdmin = req.user?.isAdmin;
-
-      const order = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId)
+      res.status(501).json({
+        error: "Invoice functionality not yet implemented - Invoice model needs to be created"
       });
-
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-
-      // Check if user has access to this order
-      if (!isAdmin && order.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const invoice = await db.query.invoices.findFirst({
-        where: eq(invoices.orderId, orderId),
-        with: {
-          lineItems: true
-        }
-      });
-
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-
-      res.json(invoice);
     } catch (error: any) {
       console.error("Error fetching invoice:", error);
       res.status(500).json({ error: "Failed to fetch invoice" });
@@ -492,37 +383,9 @@ export function setupOrderManagementRoutes(app: Express): void {
   // GET /api/v1/orders/{orderId}/tracking - Get order tracking
   app.get("/api/v1/orders/:orderId/tracking", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { orderId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
-      const isAdmin = req.user?.isAdmin;
-
-      const order = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId)
+      res.status(501).json({
+        error: "Tracking functionality not yet implemented - Tracking model needs to be created"
       });
-
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-
-      // Check if user has access to this order
-      if (!isAdmin && order.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const trackingInfo = await db.query.tracking.findFirst({
-        where: eq(tracking.orderId, orderId),
-        with: {
-          events: {
-            orderBy: desc(trackingEvents.timestamp)
-          }
-        }
-      });
-
-      if (!trackingInfo) {
-        return res.status(404).json({ error: "Tracking information not available" });
-      }
-
-      res.json(trackingInfo);
     } catch (error: any) {
       console.error("Error fetching tracking:", error);
       res.status(500).json({ error: "Failed to fetch tracking information" });
@@ -532,40 +395,8 @@ export function setupOrderManagementRoutes(app: Express): void {
   // POST /api/v1/orders/{orderId}/review - Add review for order
   app.post("/api/v1/orders/:orderId/review", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { orderId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
-      
-      const reviewData = addOrderReviewSchema.parse(req.body);
-
-      const order = await db.query.orders.findFirst({
-        where: eq(orders.id, orderId)
-      });
-
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-
-      // Check if user owns this order
-      if (order.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      // Check if order is eligible for review (delivered)
-      if (order.status !== "delivered") {
-        return res.status(400).json({ error: "Order must be delivered to leave a review" });
-      }
-
-      // Create review (assuming we have a reviews table)
-      // This would use the existing reviews functionality
-
-      res.json({
-        message: "Review submitted successfully",
-        review: {
-          orderId,
-          productId: reviewData.productId,
-          rating: reviewData.rating,
-          comment: reviewData.comment
-        }
+      res.status(501).json({
+        error: "Review functionality not yet implemented in order service - Use separate review endpoint"
       });
     } catch (error: any) {
       console.error("Error submitting review:", error);

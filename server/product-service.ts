@@ -1,6 +1,5 @@
-import { products, categories, productVariants, productMedia, brands } from "@shared/schema";
-import { eq, desc, asc, ilike, and, sql, or, gte, lte } from "drizzle-orm";
-import { db } from "./drizzle";
+import { Product, Category, Brand } from "./models/index";
+import { nanoid } from "nanoid";
 
 export class ProductService {
   
@@ -32,115 +31,103 @@ export class ProductService {
       offset = 0
     } = params;
 
-    const conditions = [eq(products.status, status)];
+    const searchQuery: any = { status };
 
     // Text search
     if (query) {
-      conditions.push(
-        or(
-          ilike(products.name, `%${query}%`),
-          ilike(products.description, `%${query}%`)
-        ) as any
-      );
+      searchQuery.$or = [
+        { name: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } }
+      ];
     }
 
     // Category filter
     if (categoryId) {
-      conditions.push(eq(products.categoryId, categoryId));
+      searchQuery.categoryId = categoryId;
     }
 
     // Brand filter
     if (brandId) {
-      conditions.push(eq(products.brandId, brandId));
+      searchQuery.brandId = brandId;
     }
 
     // Price filters
-    if (minPrice !== undefined) {
-      conditions.push(gte(products.price, minPrice.toString()));
-    }
-    if (maxPrice !== undefined) {
-      conditions.push(lte(products.price, maxPrice.toString()));
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      searchQuery.price = {};
+      if (minPrice !== undefined) {
+        searchQuery.price.$gte = minPrice;
+      }
+      if (maxPrice !== undefined) {
+        searchQuery.price.$lte = maxPrice;
+      }
     }
 
     // Attribute filters
     if (attributes) {
       for (const [key, value] of Object.entries(attributes)) {
-        conditions.push(sql`${products.attributes}->>${key} = ${value}`);
+        searchQuery[`attributes.${key}`] = value;
       }
     }
 
-    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
-
-    // Sort mapping
-    const sortColumn = {
-      name: products.name,
-      price: products.price,
-      rating: products.rating,
-      created: products.createdAt
+    const sortField = {
+      name: 'name',
+      price: 'price',
+      rating: 'rating',
+      created: 'createdAt'
     }[sortBy];
 
-    const [productsResult, countResult] = await Promise.all([
-      db.select({
-        product: products,
-        category: categories,
-        brand: brands
-      })
-        .from(products)
-        .leftJoin(categories, eq(products.categoryId, categories.id))
-        .leftJoin(brands, eq(products.brandId, brands.id))
-        .where(whereClause)
-        .orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+
+    const [productsResult, total] = await Promise.all([
+      Product.find(searchQuery)
+        .sort({ [sortField]: sortDirection })
         .limit(limit)
-        .offset(offset),
-      
-      db.select({ count: sql<number>`count(*)` })
-        .from(products)
-        .where(whereClause)
+        .skip(offset)
+        .lean(),
+      Product.countDocuments(searchQuery)
     ]);
 
+    // Populate with category and brand info
+    const productsWithDetails = await Promise.all(
+      productsResult.map(async (product) => {
+        const [category, brand] = await Promise.all([
+          product.categoryId ? Category.findById(product.categoryId).lean() : Promise.resolve(null),
+          product.brandId ? Brand.findById(product.brandId).lean() : Promise.resolve(null)
+        ]);
+        return this.formatProductResponse(product, category, brand);
+      })
+    );
+
     return {
-      products: productsResult.map(row => this.formatProductResponse(row.product, row.category, row.brand)),
-      total: countResult[0].count,
+      products: productsWithDetails,
+      total,
       pagination: {
         limit,
         offset,
-        hasMore: countResult[0].count > offset + limit
+        hasMore: total > offset + limit
       }
     };
   }
 
   // Get product with all related data
   async getProductWithDetails(productId: string) {
-    const [productResult] = await db.select({
-      product: products,
-      category: categories,
-      brand: brands
-    })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .leftJoin(brands, eq(products.brandId, brands.id))
-      .where(eq(products.id, productId));
+    const product = await Product.findById(productId).lean();
 
-    if (!productResult) {
+    if (!product) {
       return null;
     }
 
-    // Get variants and media
-    const [variants, media] = await Promise.all([
-      this.getProductVariants(productId),
-      this.getProductMedia(productId)
+    const [category, brand] = await Promise.all([
+      product.categoryId ? Category.findById(product.categoryId).lean() : Promise.resolve(null),
+      product.brandId ? Brand.findById(product.brandId).lean() : Promise.resolve(null)
     ]);
 
-    const formattedProduct = this.formatProductResponse(
-      productResult.product,
-      productResult.category,
-      productResult.brand
-    );
+    const formattedProduct = this.formatProductResponse(product, category, brand);
 
     return {
       ...formattedProduct,
-      variants,
-      media
+      variants: [],
+      media: []
     };
   }
 
@@ -152,12 +139,9 @@ export class ProductService {
     }
 
     // Check for duplicate SKU
-    const existingProduct = await db.select()
-      .from(products)
-      .where(eq(products.sku, productData.sku))
-      .limit(1);
+    const existingProduct = await Product.findOne({ sku: productData.sku });
 
-    if (existingProduct.length > 0) {
+    if (existingProduct) {
       throw new Error('Product with this SKU already exists');
     }
 
@@ -166,17 +150,18 @@ export class ProductService {
       productData.slug = this.generateSlug(productData.name);
     }
 
-    const [newProduct] = await db.insert(products).values({
+    const newProduct = await Product.create({
+      _id: `prod_${nanoid()}`,
       sku: productData.sku,
       name: productData.name,
       slug: productData.slug,
       description: productData.description,
       shortDescription: productData.shortDescription,
-      price: productData.price.toString(),
-      basePrice: productData.basePrice?.toString(),
-      salePrice: productData.salePrice?.toString(),
+      price: productData.price,
+      basePrice: productData.basePrice,
+      salePrice: productData.salePrice,
       currency: productData.currency || 'USD',
-      taxRate: productData.taxRate || '0',
+      taxRate: productData.taxRate || 0,
       categoryId: productData.categoryId,
       brandId: productData.brandId,
       stock: productData.stock || 0,
@@ -184,190 +169,135 @@ export class ProductService {
       seo: productData.seo || {},
       status: productData.status || 'active',
       imageUrl: productData.imageUrl,
-      images: productData.images || []
-    } as any).returning();
+      images: productData.images || [],
+      categories: productData.categories || []
+    });
 
-    return newProduct;
+    return {
+      id: newProduct._id.toString(),
+      ...newProduct.toObject()
+    };
   }
 
   // Update product with validation
   async updateProduct(productId: string, productData: any) {
-    const existingProduct = await db.select()
-      .from(products)
-      .where(eq(products.id, productId))
-      .limit(1);
+    const existingProduct = await Product.findById(productId);
 
-    if (existingProduct.length === 0) {
+    if (!existingProduct) {
       throw new Error('Product not found');
     }
 
     // Check for duplicate SKU if changing
-    if (productData.sku && productData.sku !== existingProduct[0].sku) {
-      const duplicateSku = await db.select()
-        .from(products)
-        .where(and(
-          eq(products.sku, productData.sku),
-          sql`${products.id} != ${productId}`
-        ))
-        .limit(1);
+    if (productData.sku && productData.sku !== existingProduct.sku) {
+      const duplicateSku = await Product.findOne({ 
+        sku: productData.sku,
+        _id: { $ne: productId }
+      });
 
-      if (duplicateSku.length > 0) {
+      if (duplicateSku) {
         throw new Error('Product with this SKU already exists');
       }
     }
 
-    const updateData: any = {
-      updatedAt: sql`now()`
-    };
+    const updateData: any = {};
 
     // Only update provided fields
     const fields = ['sku', 'name', 'slug', 'description', 'shortDescription', 
                    'price', 'basePrice', 'salePrice', 'currency', 'taxRate',
-                   'categoryId', 'brandId', 'stock', 'attributes', 'seo', 'status'];
+                   'categoryId', 'brandId', 'stock', 'attributes', 'seo', 'status',
+                   'imageUrl', 'images', 'categories'];
     
     for (const field of fields) {
       if (productData[field] !== undefined) {
-        if (['price', 'basePrice', 'salePrice', 'taxRate'].includes(field)) {
-          updateData[field] = productData[field]?.toString();
-        } else {
-          updateData[field] = productData[field];
-        }
+        updateData[field] = productData[field];
       }
     }
 
-    const [updatedProduct] = await db.update(products)
-      .set(updateData)
-      .where(eq(products.id, productId))
-      .returning();
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      { $set: updateData },
+      { new: true }
+    );
 
-    return updatedProduct;
+    return {
+      id: updatedProduct!._id.toString(),
+      ...updatedProduct!.toObject()
+    };
   }
 
   // Product variants management
   async getProductVariants(productId: string) {
-    const variants = await db.select()
-      .from(productVariants)
-      .where(eq(productVariants.productId, productId))
-      .orderBy(asc(productVariants.createdAt));
-
-    return variants.map(variant => ({
-      variantId: variant.id,
-      sku: variant.sku,
-      attributes: variant.attributes || {},
-      pricing: {
-        price: variant.price,
-        compareAtPrice: variant.compareAtPrice
-      },
-      inventory: {
-        quantity: variant.quantity || 0,
-        reserved: variant.reserved || 0
-      },
-      media: variant.media || [],
-      status: variant.status,
-      createdAt: variant.createdAt,
-      updatedAt: variant.updatedAt
-    }));
+    // Simplified - variants not yet in MongoDB models
+    return [];
   }
 
   async createProductVariant(productId: string, variantData: any) {
-    // Validate product exists
-    const product = await db.select()
-      .from(products)
-      .where(eq(products.id, productId))
-      .limit(1);
-
-    if (product.length === 0) {
-      throw new Error('Product not found');
-    }
-
-    // Check for duplicate SKU
-    if (variantData.sku) {
-      const existingSku = await db.select()
-        .from(productVariants)
-        .where(eq(productVariants.sku, variantData.sku))
-        .limit(1);
-
-      if (existingSku.length > 0) {
-        throw new Error('Variant with this SKU already exists');
-      }
-    }
-
-    const [newVariant] = await db.insert(productVariants).values({
-      productId,
-      sku: variantData.sku,
-      attributes: variantData.attributes || {},
-      price: variantData.pricing?.price || '0',
-      compareAtPrice: variantData.pricing?.compareAtPrice,
-      quantity: variantData.inventory?.quantity || 0,
-      reserved: variantData.inventory?.reserved || 0,
-      media: variantData.media || [],
-      status: variantData.status || 'active'
-    } as any).returning();
-
-    return newVariant;
+    // Simplified - variants not yet in MongoDB models
+    throw new Error('Product variants not yet implemented in MongoDB');
   }
 
   // Product media management
   async getProductMedia(productId: string) {
-    const media = await db.select()
-      .from(productMedia)
-      .where(eq(productMedia.productId, productId))
-      .orderBy(asc(productMedia.position));
-
-    return media.map(item => ({
-      mediaId: item.id,
-      type: item.type,
-      url: item.url,
-      thumbnailUrl: item.thumbnailUrl,
-      alt: item.alt,
-      position: item.position
+    // Simplified - using product.images array instead
+    const product = await Product.findById(productId).lean();
+    if (!product || !product.images) return [];
+    
+    return product.images.map((url, index) => ({
+      mediaId: `${productId}_${index}`,
+      type: 'image',
+      url,
+      thumbnailUrl: url,
+      alt: product.name,
+      position: index
     }));
   }
 
   async addProductMedia(productId: string, mediaData: any) {
-    const [newMedia] = await db.insert(productMedia).values({
+    // Simplified - add to images array
+    const product = await Product.findByIdAndUpdate(
       productId,
-      type: mediaData.type || 'image',
-      url: mediaData.url,
-      thumbnailUrl: mediaData.thumbnailUrl,
-      alt: mediaData.alt,
-      position: mediaData.position || 0
-    } as any).returning();
+      { $push: { images: mediaData.url } },
+      { new: true }
+    );
 
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    const position = product.images.length - 1;
     return {
-      mediaId: newMedia.id,
-      type: newMedia.type,
-      url: newMedia.url,
-      thumbnailUrl: newMedia.thumbnailUrl,
-      alt: newMedia.alt,
-      position: newMedia.position
+      mediaId: `${productId}_${position}`,
+      type: 'image',
+      url: mediaData.url,
+      thumbnailUrl: mediaData.url,
+      alt: product.name,
+      position
     };
   }
 
   // Get available filters for products
   async getProductFilters() {
     try {
-      const [categoriesData, priceRange, attributeOptions] = await Promise.all([
-        db.select().from(categories).where(eq(categories.status, 'active')),
-        db.select({
-          min: sql<number>`MIN(${products.price}::numeric)`,
-          max: sql<number>`MAX(${products.price}::numeric)`
-        }).from(products).where(eq(products.status, 'active')),
-        this.getAttributeOptions()
+      const [categoriesData, priceRange, brandsData] = await Promise.all([
+        Category.find({ status: 'active' }).lean(),
+        Product.aggregate([
+          { $match: { status: 'active' } },
+          {
+            $group: {
+              _id: null,
+              min: { $min: '$price' },
+              max: { $max: '$price' }
+            }
+          }
+        ]),
+        Brand.find({ status: 'active' }).lean()
       ]);
 
-      // Get brands separately to handle potential errors
-      let brandsData: any[] = [];
-      try {
-        brandsData = await db.select().from(brands).where(eq(brands.status, 'active'));
-      } catch (error) {
-        console.log('Brands table may not exist yet:', error);
-        brandsData = [];
-      }
+      const attributeOptions = await this.getAttributeOptions();
 
       return {
-        categories: categoriesData,
-        brands: brandsData,
+        categories: categoriesData.map(c => ({ id: c._id.toString(), ...c })),
+        brands: brandsData.map(b => ({ id: b._id.toString(), ...b })),
         priceRange: {
           min: priceRange[0]?.min || 0,
           max: priceRange[0]?.max || 1000
@@ -376,7 +306,6 @@ export class ProductService {
       };
     } catch (error) {
       console.error('Error getting product filters:', error);
-      // Return basic filters if there's an error
       return {
         categories: [],
         brands: [],
@@ -391,12 +320,13 @@ export class ProductService {
 
   // Get unique attribute options from all products
   private async getAttributeOptions() {
-    const products = await db.select({ attributes: products.attributes })
-      .from(products)
-      .where(and(
-        eq(products.status, 'active'),
-        sql`${products.attributes} IS NOT NULL`
-      ));
+    const products = await Product.find(
+      { 
+        status: 'active',
+        attributes: { $exists: true, $ne: null }
+      },
+      { attributes: 1 }
+    ).lean();
 
     const attributeMap: Record<string, Set<any>> = {};
 
@@ -423,7 +353,7 @@ export class ProductService {
   // Format product for API response
   private formatProductResponse(product: any, category: any = null, brand: any = null) {
     return {
-      productId: product.id,
+      productId: product._id?.toString() || product.id,
       sku: product.sku,
       name: product.name,
       slug: product.slug,
@@ -431,7 +361,7 @@ export class ProductService {
       shortDescription: product.shortDescription,
       categories: product.categories || [],
       brand: brand ? {
-        brandId: brand.id,
+        brandId: brand._id?.toString() || brand.id,
         name: brand.name,
         logo: brand.logo
       } : null,
@@ -439,7 +369,7 @@ export class ProductService {
         basePrice: product.basePrice || product.price,
         salePrice: product.salePrice,
         currency: product.currency || 'USD',
-        taxRate: product.taxRate || '0'
+        taxRate: product.taxRate || 0
       },
       attributes: product.attributes || {},
       seo: product.seo || {},
@@ -452,7 +382,7 @@ export class ProductService {
         publishedAt: product.publishedAt
       },
       category: category ? {
-        id: category.id,
+        id: category._id?.toString() || category.id,
         name: category.name,
         slug: category.slug
       } : null,

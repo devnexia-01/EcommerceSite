@@ -1,6 +1,5 @@
-import { brands, products } from "@shared/schema";
-import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
-import { db } from "./drizzle";
+import { Brand, Product } from "./models/index";
+import { nanoid } from "nanoid";
 
 export class BrandService {
 
@@ -21,63 +20,52 @@ export class BrandService {
       offset = 0
     } = params;
 
-    const conditions = [eq(brands.status, status)];
+    const query: any = { status };
 
     if (search) {
-      conditions.push(ilike(brands.name, `%${search}%`));
+      query.name = { $regex: search, $options: 'i' };
     }
 
-    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+    const sortField = sortBy === 'created' ? 'createdAt' : 'name';
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
-    const sortColumn = {
-      name: brands.name,
-      created: brands.createdAt
-    }[sortBy];
-
-    const [brandsResult, countResult] = await Promise.all([
-      db.select()
-        .from(brands)
-        .where(whereClause)
-        .orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
+    const [brandsResult, total] = await Promise.all([
+      Brand.find(query)
+        .sort({ [sortField]: sortDirection })
         .limit(limit)
-        .offset(offset),
-      
-      db.select({ count: sql<number>`count(*)` })
-        .from(brands)
-        .where(whereClause)
+        .skip(offset)
+        .lean(),
+      Brand.countDocuments(query)
     ]);
 
     return {
-      brands: brandsResult,
-      total: countResult[0].count,
+      brands: brandsResult.map(b => ({ id: b._id.toString(), ...b })),
+      total,
       pagination: {
         limit,
         offset,
-        hasMore: countResult[0].count > offset + limit
+        hasMore: total > offset + limit
       }
     };
   }
 
   async getBrandById(brandId: string) {
-    const [brand] = await db.select()
-      .from(brands)
-      .where(eq(brands.id, brandId));
+    const brand = await Brand.findById(brandId).lean();
 
     if (!brand) {
       return null;
     }
 
     // Get product count for this brand
-    const [productCount] = await db.select({ count: sql<number>`count(*)` })
-      .from(products)
-      .where(and(
-        eq(products.brandId, brandId),
-        eq(products.status, 'active')
-      ));
+    const productCount = await Product.countDocuments({ 
+      brandId, 
+      status: 'active' 
+    });
 
     return {
+      id: brand._id.toString(),
       ...brand,
-      productCount: productCount.count
+      productCount
     };
   }
 
@@ -100,25 +88,26 @@ export class BrandService {
     }
 
     // Check for duplicate slug
-    const existingBrand = await db.select()
-      .from(brands)
-      .where(eq(brands.slug, brandData.slug))
-      .limit(1);
+    const existingBrand = await Brand.findOne({ slug: brandData.slug });
 
-    if (existingBrand.length > 0) {
+    if (existingBrand) {
       throw new Error('Brand with this slug already exists');
     }
 
-    const [newBrand] = await db.insert(brands).values({
+    const newBrand = await Brand.create({
+      _id: `brand_${nanoid()}`,
       name: brandData.name,
       slug: brandData.slug,
       description: brandData.description,
       logo: brandData.logo,
       website: brandData.website,
       status: brandData.status || 'active'
-    } as any).returning();
+    });
 
-    return newBrand;
+    return {
+      id: newBrand._id.toString(),
+      ...newBrand.toObject()
+    };
   }
 
   async updateBrand(brandId: string, brandData: Partial<{
@@ -129,33 +118,25 @@ export class BrandService {
     website: string;
     status: string;
   }>) {
-    const existingBrand = await db.select()
-      .from(brands)
-      .where(eq(brands.id, brandId))
-      .limit(1);
+    const existingBrand = await Brand.findById(brandId);
 
-    if (existingBrand.length === 0) {
+    if (!existingBrand) {
       throw new Error('Brand not found');
     }
 
     // Check for duplicate slug if changing
-    if (brandData.slug && brandData.slug !== existingBrand[0].slug) {
-      const duplicateSlug = await db.select()
-        .from(brands)
-        .where(and(
-          eq(brands.slug, brandData.slug),
-          sql`${brands.id} != ${brandId}`
-        ))
-        .limit(1);
+    if (brandData.slug && brandData.slug !== existingBrand.slug) {
+      const duplicateSlug = await Brand.findOne({ 
+        slug: brandData.slug,
+        _id: { $ne: brandId }
+      });
 
-      if (duplicateSlug.length > 0) {
+      if (duplicateSlug) {
         throw new Error('Brand with this slug already exists');
       }
     }
 
-    const updateData: any = {
-      updatedAt: sql`now()`
-    };
+    const updateData: any = {};
 
     // Only update provided fields
     const fields = ['name', 'slug', 'description', 'logo', 'website', 'status'];
@@ -166,25 +147,27 @@ export class BrandService {
       }
     }
 
-    const [updatedBrand] = await db.update(brands)
-      .set(updateData)
-      .where(eq(brands.id, brandId))
-      .returning();
+    const updatedBrand = await Brand.findByIdAndUpdate(
+      brandId,
+      { $set: updateData },
+      { new: true }
+    );
 
-    return updatedBrand;
+    return {
+      id: updatedBrand!._id.toString(),
+      ...updatedBrand!.toObject()
+    };
   }
 
   async deleteBrand(brandId: string) {
     // Check if brand has associated products
-    const [productCount] = await db.select({ count: sql<number>`count(*)` })
-      .from(products)
-      .where(eq(products.brandId, brandId));
+    const productCount = await Product.countDocuments({ brandId });
 
-    if (productCount.count > 0) {
-      throw new Error(`Cannot delete brand with ${productCount.count} associated products`);
+    if (productCount > 0) {
+      throw new Error(`Cannot delete brand with ${productCount} associated products`);
     }
 
-    await db.delete(brands).where(eq(brands.id, brandId));
+    await Brand.findByIdAndDelete(brandId);
   }
 
   async getBrandProducts(brandId: string, params: {
@@ -202,37 +185,35 @@ export class BrandService {
       status = 'active'
     } = params;
 
-    const conditions = [
-      eq(products.brandId, brandId),
-      eq(products.status, status)
-    ];
+    const query = {
+      brandId,
+      status
+    };
 
-    const sortColumn = {
-      name: products.name,
-      price: products.price,
-      created: products.createdAt
+    const sortField = {
+      name: 'name',
+      price: 'price',
+      created: 'createdAt'
     }[sortBy];
 
-    const [productsResult, countResult] = await Promise.all([
-      db.select()
-        .from(products)
-        .where(and(...conditions))
-        .orderBy(sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+
+    const [productsResult, total] = await Promise.all([
+      Product.find(query)
+        .sort({ [sortField]: sortDirection })
         .limit(limit)
-        .offset(offset),
-      
-      db.select({ count: sql<number>`count(*)` })
-        .from(products)
-        .where(and(...conditions))
+        .skip(offset)
+        .lean(),
+      Product.countDocuments(query)
     ]);
 
     return {
-      products: productsResult,
-      total: countResult[0].count,
+      products: productsResult.map(p => ({ id: p._id.toString(), ...p })),
+      total,
       pagination: {
         limit,
         offset,
-        hasMore: countResult[0].count > offset + limit
+        hasMore: total > offset + limit
       }
     };
   }

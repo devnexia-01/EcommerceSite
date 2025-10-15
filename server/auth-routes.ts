@@ -6,14 +6,36 @@ import { nanoid } from 'nanoid';
 import { storage } from './storage';
 import { AuthUtils } from './auth-utils';
 import { emailNotificationService } from './email-service';
-import { 
-  registerSchema, 
-  loginSchema, 
-  forgotPasswordSchema, 
-  resetPasswordSchema,
-  verifyEmailSchema,
-  enable2FASchema
-} from '@shared/schema';
+// Define auth schemas locally since they're not in @shared/schema
+const registerSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional()
+});
+
+const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required')
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email address')
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters')
+});
+
+const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Token is required')
+});
+
+const enable2FASchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits')
+});
 
 // Enhanced request interface with user data
 export interface AuthenticatedRequest extends Request {

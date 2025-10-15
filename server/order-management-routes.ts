@@ -1,17 +1,10 @@
 import { Router, type Request, Response, NextFunction } from "express";
 import { nanoid } from "nanoid";
-import { 
-  orders, orderItems, returns, returnItems, invoices, invoiceLineItems,
-  tracking, trackingEvents, orderStatusHistory, shipments, shipmentItems,
-  reviews, products, users
-} from "@shared/schema";
-import { 
-  insertOrderSchema, insertOrderItemSchema, insertReturnSchema, insertReturnItemSchema,
-  insertInvoiceSchema, insertInvoiceLineItemSchema, insertTrackingSchema, 
-  insertTrackingEventSchema, insertOrderStatusHistorySchema, insertShipmentSchema,
-  insertShipmentItemSchema, insertReviewSchema
-} from "@shared/schema";
-import { eq, desc, and, sql, or } from "drizzle-orm";
+import { Order, OrderItem, Product, User } from "./models/index";
+// NOTE: The following models don't exist yet in MongoDB and need to be created:
+// - Return, ReturnItem, Invoice, InvoiceLineItem
+// - Tracking, TrackingEvent, OrderStatusHistory
+// - Shipment, ShipmentItem, Review
 import { authenticateToken } from "./auth-routes";
 
 // Enhanced request interface with user data
@@ -39,51 +32,6 @@ function generateOrderNumber(): string {
   return `ORD-${timestamp.slice(-6)}${random}`;
 }
 
-// Helper function to generate return number
-function generateReturnNumber(): string {
-  const timestamp = Date.now().toString();
-  const random = nanoid(6).toUpperCase();
-  return `RET-${timestamp.slice(-6)}${random}`;
-}
-
-// Helper function to generate invoice number
-function generateInvoiceNumber(): string {
-  const timestamp = Date.now().toString();
-  const random = nanoid(6).toUpperCase();
-  return `INV-${timestamp.slice(-6)}${random}`;
-}
-
-// Helper function to generate shipment number
-function generateShipmentNumber(): string {
-  const timestamp = Date.now().toString();
-  const random = nanoid(6).toUpperCase();
-  return `SHP-${timestamp.slice(-6)}${random}`;
-}
-
-// Helper function to add order status history
-async function addOrderStatusHistory(
-  orderId: string,
-  fromStatus: string | null,
-  toStatus: string,
-  reason?: string,
-  notes?: string,
-  triggeredBy?: { id: string; type: string; name: string }
-) {
-  await db.insert(orderStatusHistory).values({
-    orderId,
-    fromStatus,
-    toStatus,
-    reason,
-    notes,
-    triggeredById: triggeredBy?.id,
-    triggeredByType: triggeredBy?.type || "system",
-    triggeredByName: triggeredBy?.name || "System",
-    customerNotified: true,
-    merchantNotified: true,
-    notificationMethods: ["email"]
-  });
-}
-
 // 1. POST /api/v1/orders - Create new order
 router.post("/orders", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -92,47 +40,39 @@ router.post("/orders", authenticateToken, async (req: AuthenticatedRequest, res:
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const orderData = insertOrderSchema.parse({
+    const orderData = {
       ...req.body,
       userId,
       orderNumber: generateOrderNumber()
-    });
+    };
 
-    // Start transaction for order creation
-    const result = await db.transaction(async (tx) => {
-      // Create order
-      const [newOrder] = await tx.insert(orders).values([orderData]).returning();
-      
-      // Create order items if provided
-      if (req.body.items && Array.isArray(req.body.items)) {
-        const orderItemsData = req.body.items.map((item: any) => ({
-          ...item,
-          orderId: newOrder.id,
+    // Create order
+    const newOrder = await Order.create({
+      _id: `ord_${nanoid()}`,
+      ...orderData
+    });
+    
+    // Create order items if provided
+    if (req.body.items && Array.isArray(req.body.items)) {
+      for (const item of req.body.items) {
+        await OrderItem.create({
+          _id: `oi_${nanoid()}`,
+          orderId: newOrder._id.toString(),
           sku: item.sku || `SKU-${nanoid(8)}`,
           name: item.name || "Product",
-          unitPrice: item.unitPrice || item.price || "0.00",
-          totalPrice: item.totalPrice || item.total || "0.00",
-          price: item.price || item.unitPrice || "0.00",
-          total: item.total || item.totalPrice || "0.00"
-        }));
-        
-        await tx.insert(orderItems).values(orderItemsData);
+          unitPrice: item.unitPrice || item.price || 0,
+          totalPrice: item.totalPrice || item.total || 0,
+          price: item.price || item.unitPrice || 0,
+          total: item.total || item.totalPrice || 0,
+          ...item
+        });
       }
+    }
 
-      // Add initial status history
-      await addOrderStatusHistory(
-        newOrder.id,
-        null,
-        newOrder.status || "pending",
-        "Order created",
-        "New order placed",
-        { id: userId, type: "user", name: "Customer" }
-      );
-
-      return newOrder;
+    res.status(201).json({
+      id: newOrder._id.toString(),
+      ...newOrder.toObject()
     });
-
-    res.status(201).json(result);
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(400).json({ error: "Failed to create order" });
@@ -145,41 +85,7 @@ router.get("/orders/:orderId", authenticateToken, async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user?.id;
 
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-      with: {
-        orderItems: {
-          with: {
-            product: true
-          }
-        },
-        returns: {
-          with: {
-            returnItems: true
-          }
-        },
-        invoices: {
-          with: {
-            lineItems: true
-          }
-        },
-        tracking: {
-          with: {
-            events: {
-              orderBy: desc(trackingEvents.timestamp)
-            }
-          }
-        },
-        statusHistory: {
-          orderBy: desc(orderStatusHistory.timestamp)
-        },
-        shipments: {
-          with: {
-            items: true
-          }
-        }
-      }
-    });
+    const order = await Order.findById(orderId).lean();
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
@@ -190,7 +96,14 @@ router.get("/orders/:orderId", authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    res.json(order);
+    // Get order items
+    const orderItems = await OrderItem.find({ orderId }).lean();
+
+    res.json({
+      id: order._id.toString(),
+      ...order,
+      orderItems: orderItems.map(item => ({ id: item._id.toString(), ...item }))
+    });
   } catch (error) {
     console.error("Error fetching order:", error);
     res.status(500).json({ error: "Failed to fetch order" });
@@ -208,22 +121,17 @@ router.get("/orders/user/:userId", authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    const userOrders = await db.query.orders.findMany({
-      where: eq(orders.userId, userId),
-      with: {
-        orderItems: {
-          with: {
-            product: true
-          }
-        }
-      },
-      orderBy: desc(orders.createdAt),
-      limit: parseInt(req.query.limit as string) || 50,
-      offset: parseInt(req.query.offset as string) || 0
-    });
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const userOrders = await Order.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(offset)
+      .lean();
 
     res.json({
-      orders: userOrders,
+      orders: userOrders.map(order => ({ id: order._id.toString(), ...order })),
       total: userOrders.length
     });
   } catch (error) {
@@ -244,9 +152,7 @@ router.put("/orders/:orderId/status", authenticateToken, async (req, res) => {
     }
 
     // Get current order
-    const currentOrder = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId)
-    });
+    const currentOrder = await Order.findById(orderId);
 
     if (!currentOrder) {
       return res.status(404).json({ error: "Order not found" });
@@ -257,35 +163,23 @@ router.put("/orders/:orderId/status", authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "Admin access required" });
     }
 
-    const result = await db.transaction(async (tx) => {
-      // Update order status
-      const [updatedOrder] = await tx
-        .update(orders)
-        .set({ 
-          status,
-          updatedAt: sql`now()`,
-          ...(status === "confirmed" && { confirmedAt: sql`now()` }),
-          ...(status === "shipped" && { shippedAt: sql`now()` }),
-          ...(status === "delivered" && { deliveredAt: sql`now()` }),
-          ...(status === "cancelled" && { cancelledAt: sql`now()` })
-        })
-        .where(eq(orders.id, orderId))
-        .returning();
+    const updateFields: any = { status };
 
-      // Add status history
-      await addOrderStatusHistory(
-        orderId,
-        currentOrder.status,
-        status,
-        reason,
-        notes,
-        { id: userId!, type: "admin", name: req.user?.username || "Admin" }
-      );
+    if (status === "confirmed") updateFields.confirmedAt = new Date();
+    if (status === "shipped") updateFields.shippedAt = new Date();
+    if (status === "delivered") updateFields.deliveredAt = new Date();
+    if (status === "cancelled") updateFields.cancelledAt = new Date();
 
-      return updatedOrder;
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { $set: updateFields },
+      { new: true }
+    );
+
+    res.json({
+      id: updatedOrder!._id.toString(),
+      ...updatedOrder!.toObject()
     });
-
-    res.json(result);
   } catch (error) {
     console.error("Error updating order status:", error);
     res.status(500).json({ error: "Failed to update order status" });
@@ -299,9 +193,7 @@ router.post("/orders/:orderId/cancel", authenticateToken, async (req, res) => {
     const { reason, notes } = req.body;
     const userId = req.user?.id;
 
-    const currentOrder = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId)
-    });
+    const currentOrder = await Order.findById(orderId);
 
     if (!currentOrder) {
       return res.status(404).json({ error: "Order not found" });
@@ -317,296 +209,43 @@ router.post("/orders/:orderId/cancel", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Order cannot be cancelled in current status" });
     }
 
-    const result = await db.transaction(async (tx) => {
-      // Update order status to cancelled
-      const [updatedOrder] = await tx
-        .update(orders)
-        .set({ 
-          status: "cancelled",
-          cancelledAt: sql`now()`,
-          updatedAt: sql`now()`
-        })
-        .where(eq(orders.id, orderId))
-        .returning();
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { $set: { status: "cancelled", cancelledAt: new Date() } },
+      { new: true }
+    );
 
-      // Add status history
-      await addOrderStatusHistory(
-        orderId,
-        currentOrder.status,
-        "cancelled",
-        reason || "Customer requested cancellation",
-        notes,
-        { id: userId!, type: req.user?.isAdmin ? "admin" : "user", name: req.user?.username || "User" }
-      );
-
-      return updatedOrder;
+    res.json({
+      id: updatedOrder!._id.toString(),
+      ...updatedOrder!.toObject()
     });
-
-    res.json(result);
   } catch (error) {
     console.error("Error cancelling order:", error);
     res.status(500).json({ error: "Failed to cancel order" });
   }
 });
 
-// 6. POST /api/v1/orders/{orderId}/return - Create return request
+// NOTE: The following routes require models that don't exist yet:
+// - Returns (POST /orders/:orderId/return)
+// - Invoices (GET /orders/:orderId/invoice)
+// - Tracking (GET /orders/:orderId/tracking)
+// - Reviews (POST /orders/:orderId/review)
+
+// Return 501 Not Implemented for these features
 router.post("/orders/:orderId/return", authenticateToken, async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req.user?.id;
-
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-      with: {
-        orderItems: true
-      }
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Check if user owns order
-    if (order.userId !== userId && !req.user?.isAdmin) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    // Check if order is eligible for return
-    if (!["delivered"].includes(order.status || "")) {
-      return res.status(400).json({ error: "Order is not eligible for return" });
-    }
-
-    const returnData = insertReturnSchema.parse({
-      ...req.body,
-      orderId,
-      userId: order.userId,
-      returnNumber: generateReturnNumber()
-    });
-
-    const result = await db.transaction(async (tx) => {
-      // Create return
-      const [newReturn] = await tx.insert(returns).values([returnData]).returning();
-
-      // Create return items if provided
-      if (req.body.items && Array.isArray(req.body.items)) {
-        const returnItemsData = req.body.items.map((item: any) => ({
-          ...item,
-          returnId: newReturn.id
-        }));
-        
-        await tx.insert(returnItems).values(returnItemsData);
-      }
-
-      return newReturn;
-    });
-
-    res.status(201).json(result);
-  } catch (error) {
-    console.error("Error creating return:", error);
-    res.status(400).json({ error: "Failed to create return" });
-  }
+  res.status(501).json({ error: "Return functionality requires Return model to be created" });
 });
 
-// 7. GET /api/v1/orders/{orderId}/invoice - Get order invoice
 router.get("/orders/:orderId/invoice", authenticateToken, async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req.user?.id;
-
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-      with: {
-        user: true,
-        orderItems: {
-          with: {
-            product: true
-          }
-        }
-      }
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Check if user has access
-    if (order.userId !== userId && !req.user?.isAdmin) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    // Check if invoice already exists
-    let invoice = await db.query.invoices.findFirst({
-      where: eq(invoices.orderId, orderId),
-      with: {
-        lineItems: true
-      }
-    });
-
-    // Generate invoice if it doesn't exist
-    if (!invoice) {
-      const invoiceData = {
-        invoiceNumber: generateInvoiceNumber(),
-        orderId,
-        userId: order.userId,
-        status: "sent" as const,
-        type: "invoice" as const,
-        currency: order.currency || "USD",
-        customerInfo: {
-          name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
-          email: order.user.email,
-          phone: order.user.phoneNumber || undefined,
-          address: {
-            streetAddress: order.billingAddress.streetAddress,
-            city: order.billingAddress.city,
-            state: order.billingAddress.state,
-            zipCode: order.billingAddress.zipCode,
-            country: order.billingAddress.country
-          }
-        },
-        merchantInfo: {
-          name: "EliteCommerce",
-          address: {
-            streetAddress: "123 Business St",
-            city: "Commerce City",
-            state: "CA",
-            zipCode: "90210",
-            country: "USA"
-          },
-          phone: "+1-800-555-0123",
-          email: "billing@elitecommerce.com",
-          website: "https://elitecommerce.com"
-        },
-        subtotal: order.subtotal,
-        discountTotal: "0.00",
-        taxTotal: order.tax,
-        shippingTotal: order.shipping,
-        grandTotal: order.total,
-        paymentTerms: "Net 30",
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        remainingAmount: order.total,
-        issuedAt: sql`now()`,
-        sentAt: sql`now()`
-      };
-
-      const result = await db.transaction(async (tx) => {
-        const [newInvoice] = await tx.insert(invoices).values(invoiceData).returning();
-
-        // Create invoice line items
-        const lineItemsData = order.orderItems.map(item => ({
-          invoiceId: newInvoice.id,
-          productId: item.productId,
-          sku: item.sku,
-          description: item.description || item.name,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discount: "0.00",
-          taxRate: "0.0000",
-          taxAmount: "0.00",
-          totalAmount: item.totalPrice
-        }));
-
-        await tx.insert(invoiceLineItems).values(lineItemsData);
-
-        return newInvoice;
-      });
-
-      // Fetch complete invoice with line items
-      invoice = await db.query.invoices.findFirst({
-        where: eq(invoices.id, result.id),
-        with: {
-          lineItems: true
-        }
-      });
-    }
-
-    res.json(invoice);
-  } catch (error) {
-    console.error("Error fetching invoice:", error);
-    res.status(500).json({ error: "Failed to fetch invoice" });
-  }
+  res.status(501).json({ error: "Invoice functionality requires Invoice model to be created" });
 });
 
-// 8. GET /api/v1/orders/{orderId}/tracking - Get order tracking
 router.get("/orders/:orderId/tracking", authenticateToken, async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req.user?.id;
-
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId)
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Check if user has access
-    if (order.userId !== userId && !req.user?.isAdmin) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const trackingInfo = await db.query.tracking.findMany({
-      where: eq(tracking.orderId, orderId),
-      with: {
-        events: {
-          orderBy: desc(trackingEvents.timestamp)
-        }
-      },
-      orderBy: desc(tracking.createdAt)
-    });
-
-    res.json({
-      tracking: trackingInfo,
-      orderNumber: order.orderNumber,
-      orderStatus: order.status
-    });
-  } catch (error) {
-    console.error("Error fetching tracking:", error);
-    res.status(500).json({ error: "Failed to fetch tracking" });
-  }
+  res.status(501).json({ error: "Tracking functionality requires Tracking model to be created" });
 });
 
-// 9. POST /api/v1/orders/{orderId}/review - Create order review
 router.post("/orders/:orderId/review", authenticateToken, async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req.user?.id;
-
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
-      with: {
-        orderItems: true
-      }
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    // Check if user owns order
-    if (order.userId !== userId) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    // Check if order is delivered
-    if (order.status !== "delivered") {
-      return res.status(400).json({ error: "Can only review delivered orders" });
-    }
-
-    const reviewData = insertReviewSchema.parse({
-      ...req.body,
-      userId,
-      orderId,
-      verified: true // Reviews from actual purchasers are verified
-    });
-
-    const result = await db.insert(reviews).values([reviewData]).returning();
-
-    res.status(201).json(result[0]);
-  } catch (error) {
-    console.error("Error creating review:", error);
-    res.status(400).json({ error: "Failed to create review" });
-  }
+  res.status(501).json({ error: "Review functionality requires Review model to be created" });
 });
 
 export { router as orderManagementRoutes };

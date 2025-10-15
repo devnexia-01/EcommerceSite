@@ -10,8 +10,77 @@ declare module "express-session" {
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
-import { insertUserSchema, insertProductSchema, insertCategorySchema, insertAddressSchema, insertCartItemSchema, insertOrderSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
+
+// Define insert schemas locally since they're not in @shared/schema
+const insertUserSchema = z.object({
+  email: z.string().email(),
+  username: z.string().min(3).optional(),
+  password: z.string().min(8),
+  firstName: z.string().optional(),
+  lastName: z.string().optional()
+});
+
+const insertProductSchema = z.object({
+  name: z.string().min(1),
+  sku: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().optional(),
+  price: z.string().or(z.number()),
+  categoryId: z.string().optional(),
+  brandId: z.string().optional(),
+  stock: z.number().optional(),
+  imageUrl: z.string().url().optional(),
+  images: z.array(z.string()).optional()
+});
+
+const insertCategorySchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().optional(),
+  parentId: z.string().optional(),
+  imageUrl: z.string().url().optional()
+});
+
+const insertAddressSchema = z.object({
+  userId: z.string(),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  streetAddress: z.string().min(1),
+  city: z.string().min(1),
+  state: z.string().min(1),
+  zipCode: z.string().min(1),
+  country: z.string().min(1),
+  phone: z.string().optional(),
+  isDefault: z.boolean().optional()
+});
+
+const insertCartItemSchema = z.object({
+  userId: z.string(),
+  productId: z.string(),
+  quantity: z.number().min(1),
+  price: z.string().or(z.number())
+});
+
+const insertOrderSchema = z.object({
+  userId: z.string(),
+  orderNumber: z.string(),
+  total: z.string().or(z.number()),
+  subtotal: z.string().or(z.number()).optional(),
+  tax: z.string().or(z.number()).optional(),
+  shipping: z.string().or(z.number()).optional(),
+  status: z.string().optional(),
+  shippingAddress: z.any().optional(),
+  billingAddress: z.any().optional()
+});
+
+const insertReviewSchema = z.object({
+  productId: z.string(),
+  userId: z.string(),
+  rating: z.number().min(1).max(5),
+  comment: z.string().optional(),
+  title: z.string().optional()
+});
 import { setupAuthRoutes, authenticateToken, requireAdmin } from "./auth-routes";
 import { setupUserRoutes } from "./user-routes";
 import { emailNotificationService } from "./email-service";
