@@ -10,6 +10,25 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 15, 2025 - Additional Critical Bug Fixes
+- **Issues Fixed**: Multiple critical errors affecting product deletion, admin product form, and COD guest checkout
+- **Changes Made**:
+  - **Product Deletion Fix**:
+    - Added missing `deleteProductV1` method to MongoStorage class
+    - Added `deleteProductV1` to IStorage interface
+    - Product deletion now works correctly in admin panel (v1 API routes)
+  - **Zod Schema Validation Fix**:
+    - Fixed insertProductSchema to properly define categoryId and brandId using createInsertSchema refinement parameter
+    - Fixed "Invalid element at key 'categoryId/brandId': expected a Zod schema" errors
+    - Removed problematic `.omit({ slug: true })` usage in admin form that was causing schema derivation issues
+    - Admin product form now works without Zod validation errors
+  - **COD Guest Checkout Fix**:
+    - Modified buy-now complete endpoint to allow guest users to complete COD (Cash on Delivery) orders
+    - Authentication now only required for non-COD payment methods
+    - Guest users can successfully complete COD orders without login
+- **Wishlist Status**: Neon database connection errors for wishlist functionality documented as non-critical (wishlist uses separate database that's currently unavailable, doesn't affect core e-commerce functions)
+- **User Impact**: Product deletion works correctly, admin can add/edit products without validation errors, and guests can complete COD orders successfully
+
 ### October 15, 2025 - Critical Bug Fixes and Database Integration
 - **Issues Fixed**: Multiple critical errors affecting COD payments, buy-now feature, admin product management, and wishlist functionality
 - **Root Cause**: Missing database connection setup for Drizzle ORM services and validation schema issues

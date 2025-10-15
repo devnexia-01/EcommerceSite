@@ -41,9 +41,10 @@ export default function Admin() {
   const queryClient = useQueryClient();
 
   const productForm = useForm({
-    resolver: zodResolver(insertProductSchema.omit({ slug: true })),
+    resolver: zodResolver(insertProductSchema),
     defaultValues: {
       name: "",
+      slug: "",
       description: "",
       price: "",
       stock: 0,
