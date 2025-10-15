@@ -11,6 +11,7 @@ import {
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { db } from "./drizzle";
 
 // Mock Stripe service (in production, this would be the actual Stripe SDK)
 class MockStripeService {

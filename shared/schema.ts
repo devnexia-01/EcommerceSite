@@ -1263,6 +1263,9 @@ export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
   updatedAt: true
+}).extend({
+  categoryId: z.string().optional(),
+  brandId: z.string().optional()
 });
 
 export const insertProductVariantSchema = createInsertSchema(productVariants).omit({

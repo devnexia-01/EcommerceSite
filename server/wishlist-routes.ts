@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { wishlists, wishlistItems, products } from "@shared/schema";
 import { authenticateToken } from "./auth-routes.js";
+import { db } from "./drizzle";
 
 const router = Router();
 

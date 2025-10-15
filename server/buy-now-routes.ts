@@ -118,7 +118,9 @@ export function setupBuyNowRoutes(app: Express) {
       const userId = req.session?.userId;
       const sessionId = req.sessionID || req.headers['x-session-id'] as string;
       
-      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      // Strict ownership check: require exact match of either userId or sessionId
+      const isOwner = (intent.userId && intent.userId === userId) || 
+                     (intent.sessionId && intent.sessionId === sessionId);
       
       if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
@@ -188,7 +190,9 @@ export function setupBuyNowRoutes(app: Express) {
       const userId = req.session?.userId;
       const sessionId = req.sessionID || req.headers['x-session-id'] as string;
       
-      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      // Strict ownership check: require exact match of either userId or sessionId
+      const isOwner = (intent.userId && intent.userId === userId) || 
+                     (intent.sessionId && intent.sessionId === sessionId);
       
       if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
@@ -228,7 +232,9 @@ export function setupBuyNowRoutes(app: Express) {
       const userId = req.session?.userId;
       const sessionId = req.sessionID || req.headers['x-session-id'] as string;
       
-      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      // Strict ownership check: require exact match of either userId or sessionId
+      const isOwner = (intent.userId && intent.userId === userId) || 
+                     (intent.sessionId && intent.sessionId === sessionId);
       
       if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
@@ -358,7 +364,9 @@ export function setupBuyNowRoutes(app: Express) {
       const userId = req.session?.userId;
       const sessionId = req.sessionID || req.headers['x-session-id'] as string;
       
-      const isOwner = intent.userId ? intent.userId === userId : intent.sessionId === sessionId;
+      // Strict ownership check: require exact match of either userId or sessionId
+      const isOwner = (intent.userId && intent.userId === userId) || 
+                     (intent.sessionId && intent.sessionId === sessionId);
       
       if (!isOwner) {
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });

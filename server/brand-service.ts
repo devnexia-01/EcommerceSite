@@ -1,5 +1,6 @@
 import { brands, products } from "@shared/schema";
 import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
+import { db } from "./drizzle";
 
 export class BrandService {
 
