@@ -37,7 +37,7 @@ export function setupBuyNowRoutes(app: Express) {
 
       // Get user ID from session (optional for guest checkout)
       const userId = req.session?.userId;
-      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      const sessionId = req.headers['x-session-id'] as string || req.sessionID;
 
       // Get product details and check availability
       const product = await storage.getProduct(productId);
@@ -116,24 +116,13 @@ export function setupBuyNowRoutes(app: Express) {
 
       // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
       const userId = req.session?.userId;
-      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
-      
-      console.log('Buy-now GET intent - Debug:', {
-        intentId,
-        intentUserId: intent.userId,
-        intentSessionId: intent.sessionId,
-        currentUserId: userId,
-        reqSessionID: req.sessionID,
-        headerSessionId: req.headers['x-session-id'],
-        finalSessionId: sessionId
-      });
+      const sessionId = req.headers['x-session-id'] as string || req.sessionID;
       
       // Strict ownership check: require exact match of either userId or sessionId
       const isOwner = (intent.userId && intent.userId === userId) || 
                      (intent.sessionId && intent.sessionId === sessionId);
       
       if (!isOwner) {
-        console.log('Access denied - ownership check failed');
         return res.status(403).json({ message: 'Access denied - you do not own this purchase intent' });
       }
 
@@ -199,7 +188,7 @@ export function setupBuyNowRoutes(app: Express) {
 
       // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
       const userId = req.session?.userId;
-      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      const sessionId = req.headers['x-session-id'] as string || req.sessionID;
       
       // Strict ownership check: require exact match of either userId or sessionId
       const isOwner = (intent.userId && intent.userId === userId) || 
@@ -241,7 +230,7 @@ export function setupBuyNowRoutes(app: Express) {
 
       // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
       const userId = req.session?.userId;
-      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      const sessionId = req.headers['x-session-id'] as string || req.sessionID;
       
       // Strict ownership check: require exact match of either userId or sessionId
       const isOwner = (intent.userId && intent.userId === userId) || 
@@ -373,7 +362,7 @@ export function setupBuyNowRoutes(app: Express) {
 
       // Verify ownership - check both userId (for logged-in users) and sessionId (for guests)
       const userId = req.session?.userId;
-      const sessionId = req.sessionID || req.headers['x-session-id'] as string;
+      const sessionId = req.headers['x-session-id'] as string || req.sessionID;
       
       // Strict ownership check: require exact match of either userId or sessionId
       const isOwner = (intent.userId && intent.userId === userId) || 
