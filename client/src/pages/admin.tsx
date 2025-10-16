@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { 
   Plus, Edit, Trash2, Package, Users, ShoppingCart, TrendingUp, Search, Filter,
-  Settings, Image, Activity, Clock, Eye, UserMinus, Key, Download, BarChart3, CheckCircle
+  Settings, Image, Activity, Clock, Eye, UserMinus, Key, BarChart3, CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,13 +109,6 @@ export default function Admin() {
   });
 
   const adminUsers = (adminUsersData as any)?.data || (adminUsersData as any) || [];
-
-  const { data: auditLogsData, isLoading: auditLoading } = useQuery({
-    queryKey: ["/api/v1/admin/audit/logs", { limit: 50 }],
-    enabled: isAuthenticated && user?.isAdmin && activeTab === "audit"
-  });
-
-  const auditLogs = (auditLogsData as any)?.data || (auditLogsData as any) || [];
 
   const { data: userOrdersData, isLoading: userOrdersLoading } = useQuery({
     queryKey: ["/api/v1/admin/orders", { userId: selectedUser?.id }],
@@ -391,7 +384,7 @@ export default function Admin() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
               <TrendingUp className="h-4 w-4" />
               Dashboard
@@ -407,10 +400,6 @@ export default function Admin() {
             <TabsTrigger value="orders" className="flex items-center gap-2" data-testid="tab-orders">
               <ShoppingCart className="h-4 w-4" />
               Orders
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2" data-testid="tab-audit">
-              <Activity className="h-4 w-4" />
-              Audit
             </TabsTrigger>
           </TabsList>
 
@@ -1032,93 +1021,6 @@ export default function Admin() {
                           </TableCell>
                         </TableRow>
                       ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Audit Tab */}
-          <TabsContent value="audit" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Audit Logs
-                </CardTitle>
-                <Button variant="outline" data-testid="export-audit">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Logs
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search audit logs..."
-                      className="pl-8"
-                      data-testid="search-audit"
-                    />
-                  </div>
-                  <Select>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter by action" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Actions</SelectItem>
-                      <SelectItem value="create">Create</SelectItem>
-                      <SelectItem value="update">Update</SelectItem>
-                      <SelectItem value="delete">Delete</SelectItem>
-                      <SelectItem value="login">Login</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {auditLoading ? (
-                  <LoadingSpinner className="mx-auto" />
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Resource</TableHead>
-                        <TableHead>IP Address</TableHead>
-                        <TableHead>Details</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {auditLogs.data?.length === 0 ? (
-                        <TableRow>
-                          <TableCell className="text-muted-foreground text-center" colSpan={6}>
-                            No audit logs found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        auditLogs.data?.map((log: any) => (
-                          <TableRow key={log.id}>
-                            <TableCell>
-                              {new Date(log.timestamp).toLocaleString()}
-                            </TableCell>
-                            <TableCell>{log.actorName || log.actorId}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{log.action}</Badge>
-                            </TableCell>
-                            <TableCell>{log.resource}</TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {log.context?.ipAddress || 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
                     </TableBody>
                   </Table>
                 )}
