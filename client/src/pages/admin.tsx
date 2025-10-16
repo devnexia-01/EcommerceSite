@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { 
   Plus, Edit, Trash2, Package, Users, ShoppingCart, TrendingUp, Search, Filter,
-  Shield, Settings, FileText, Image, AlertTriangle, Activity, Database,
-  Clock, Eye, Ban, UserMinus, Key, Download, Upload, Server, BarChart3, CheckCircle
+  Settings, Image, Activity, Clock, Eye, UserMinus, Key, Download, BarChart3, CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +21,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { insertProductSchema, insertCategorySchema, createAdminUserSchema, insertContentSchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, createAdminUserSchema } from "@shared/schema";
 import { Link } from "wouter";
 
 export default function Admin() {
@@ -30,7 +29,6 @@ export default function Admin() {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
-  const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [isUserDetailsDialogOpen, setIsUserDetailsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
@@ -77,18 +75,6 @@ export default function Admin() {
     }
   });
 
-  const contentForm = useForm({
-    resolver: zodResolver(insertContentSchema),
-    defaultValues: {
-      title: "",
-      slug: "",
-      type: "article",
-      status: "draft",
-      body: "",
-      excerpt: ""
-    }
-  });
-
   // Queries
   const { data: productsData = { products: [], total: 0 }, isLoading: productsLoading } = useQuery({
     queryKey: ["/api/v1/products", { limit: 100, search: searchQuery }],
@@ -131,25 +117,6 @@ export default function Admin() {
 
   const auditLogs = (auditLogsData as any)?.data || (auditLogsData as any) || [];
 
-  const { data: securityLogsData, isLoading: securityLoading } = useQuery({
-    queryKey: ["/api/v1/admin/security/threats", { limit: 50 }],
-    enabled: isAuthenticated && user?.isAdmin && activeTab === "security"
-  });
-
-  const securityLogs = (securityLogsData as any)?.data || (securityLogsData as any) || [];
-
-  const { data: systemHealth, isLoading: systemLoading } = useQuery({
-    queryKey: ["/api/v1/admin/dashboard/system-health"],
-    enabled: isAuthenticated && user?.isAdmin && activeTab === "system"
-  });
-
-  const { data: contentData, isLoading: contentLoading } = useQuery({
-    queryKey: ["/api/v1/admin/content", { limit: 50 }],
-    enabled: isAuthenticated && user?.isAdmin && activeTab === "content"
-  });
-
-  const contentItems = (contentData as any)?.data || (contentData as any) || [];
-
   const { data: userOrdersData, isLoading: userOrdersLoading } = useQuery({
     queryKey: ["/api/v1/admin/orders", { userId: selectedUser?.id }],
     enabled: isAuthenticated && user?.isAdmin && !!selectedUser?.id && isUserDetailsDialogOpen
@@ -191,19 +158,6 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/v1/products"] });
       toast({ title: "Success", description: "Product deleted successfully" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  });
-
-  const createContentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/v1/admin/content", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/content"] });
-      setIsContentDialogOpen(false);
-      contentForm.reset();
-      toast({ title: "Success", description: "Content created successfully" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -437,7 +391,7 @@ export default function Admin() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
               <TrendingUp className="h-4 w-4" />
               Dashboard
@@ -454,21 +408,9 @@ export default function Admin() {
               <ShoppingCart className="h-4 w-4" />
               Orders
             </TabsTrigger>
-            <TabsTrigger value="content" className="flex items-center gap-2" data-testid="tab-content">
-              <FileText className="h-4 w-4" />
-              Content
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2" data-testid="tab-security">
-              <Shield className="h-4 w-4" />
-              Security
-            </TabsTrigger>
             <TabsTrigger value="audit" className="flex items-center gap-2" data-testid="tab-audit">
               <Activity className="h-4 w-4" />
               Audit
-            </TabsTrigger>
-            <TabsTrigger value="system" className="flex items-center gap-2" data-testid="tab-system">
-              <Server className="h-4 w-4" />
-              System
             </TabsTrigger>
           </TabsList>
 
@@ -775,7 +717,7 @@ export default function Admin() {
                                 {user.status === "suspended" ? (
                                   <CheckCircle className="h-3 w-3" />
                                 ) : (
-                                  <Ban className="h-3 w-3" />
+                                  <UserMinus className="h-3 w-3" />
                                 )}
                               </Button>
                               <Button 
@@ -1097,321 +1039,6 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* Content Management Tab */}
-          <TabsContent value="content" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Content Management</CardTitle>
-                <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button data-testid="add-content">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Content
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Create New Content</DialogTitle>
-                    </DialogHeader>
-                    <Form {...contentForm}>
-                      <form onSubmit={contentForm.handleSubmit((data) => createContentMutation.mutate(data))} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={contentForm.control}
-                            name="title"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Title *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Content title..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={contentForm.control}
-                            name="slug"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Slug *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="content-slug" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={contentForm.control}
-                            name="type"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Type *</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="article">Article</SelectItem>
-                                    <SelectItem value="page">Page</SelectItem>
-                                    <SelectItem value="media">Media</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={contentForm.control}
-                            name="status"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Status</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="published">Published</SelectItem>
-                                    <SelectItem value="archived">Archived</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <FormField
-                          control={contentForm.control}
-                          name="excerpt"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Excerpt</FormLabel>
-                              <FormControl>
-                                <Textarea placeholder="Brief description or excerpt..." className="min-h-[60px]" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={contentForm.control}
-                          name="body"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Content Body</FormLabel>
-                              <FormControl>
-                                <Textarea placeholder="Content body..." className="min-h-[200px]" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsContentDialogOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" disabled={createContentMutation.isPending}>
-                            {createContentMutation.isPending ? "Creating..." : "Create Content"}
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search content..."
-                      className="pl-8"
-                      data-testid="search-content"
-                    />
-                  </div>
-                  <Select>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter by type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Content</SelectItem>
-                      <SelectItem value="article">Articles</SelectItem>
-                      <SelectItem value="page">Pages</SelectItem>
-                      <SelectItem value="media">Media</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Author</TableHead>
-                      <TableHead>Modified</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {contentLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4">
-                          <LoadingSpinner className="mx-auto" />
-                        </TableCell>
-                      </TableRow>
-                    ) : contentItems.length === 0 ? (
-                      <TableRow>
-                        <TableCell className="text-muted-foreground text-center" colSpan={6}>
-                          No content items found. Create your first content item to get started.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      contentItems.map((content: any) => (
-                        <TableRow key={content.id}>
-                          <TableCell className="font-medium">{content.title}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize">
-                              {content.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={content.status === 'published' ? 'default' : 'secondary'} className="capitalize">
-                              {content.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{content.authorId || 'Unknown'}</TableCell>
-                          <TableCell>{content.updatedAt ? new Date(content.updatedAt).toLocaleDateString() : 'Never'}</TableCell>
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="ghost">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Security Tab */}
-          <TabsContent value="security" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Security Threats
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {securityLoading ? (
-                    <LoadingSpinner className="mx-auto" />
-                  ) : (
-                    <div className="space-y-2">
-                      {securityLogs.data?.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-4">
-                          No security threats detected
-                        </p>
-                      ) : (
-                        securityLogs.data?.slice(0, 5).map((log: any) => (
-                          <div key={log.id} className="flex items-center justify-between p-2 rounded border">
-                            <div className="flex items-center space-x-2">
-                              <AlertTriangle className={`h-4 w-4 ${
-                                log.severity === 'high' ? 'text-red-500' : 
-                                log.severity === 'medium' ? 'text-yellow-500' : 
-                                'text-blue-500'
-                              }`} />
-                              <div>
-                                <p className="text-sm font-medium">{log.type}</p>
-                                <p className="text-xs text-muted-foreground">{log.description}</p>
-                              </div>
-                            </div>
-                            <Badge variant={log.resolved ? "default" : "destructive"}>
-                              {log.resolved ? "Resolved" : "Active"}
-                            </Badge>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Ban className="h-5 w-5" />
-                    IP Blacklist
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex space-x-2">
-                      <Input placeholder="IP Address" />
-                      <Button size="sm">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="text-muted-foreground text-center py-4">
-                      No blocked IP addresses
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Failed Login Attempts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>IP Address</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>User Agent</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="text-muted-foreground text-center" colSpan={5}>
-                        No failed login attempts recorded
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Audit Tab */}
           <TabsContent value="audit" className="space-y-6 mt-6">
             <Card>
@@ -1495,101 +1122,6 @@ export default function Admin() {
                     </TableBody>
                   </Table>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* System Tab */}
-          <TabsContent value="system" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Server className="h-5 w-5" />
-                    System Health
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {systemLoading ? (
-                    <LoadingSpinner className="mx-auto" />
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span>Database</span>
-                        <Badge variant="default">Connected</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Server Status</span>
-                        <Badge variant="default">Running</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Memory Usage</span>
-                        <span className="text-sm text-muted-foreground">
-                          {(systemHealth as any)?.data?.memoryUsage?.toFixed(2) || (systemHealth as any)?.memoryUsage?.toFixed(2) || 0} MB
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Uptime</span>
-                        <span className="text-sm text-muted-foreground">
-                          {Math.floor(((systemHealth as any)?.data?.serverUptime || (systemHealth as any)?.serverUptime || 0) / 3600)}h{' '}
-                          {Math.floor((((systemHealth as any)?.data?.serverUptime || (systemHealth as any)?.serverUptime || 0) % 3600) / 60)}m
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5" />
-                    Backup Management
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Button className="w-full" data-testid="create-backup">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Create Backup
-                    </Button>
-                    <div className="text-muted-foreground text-center py-4">
-                      No recent backups
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>System Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Site Name</Label>
-                      <Input defaultValue="E-commerce Platform" />
-                    </div>
-                    <div>
-                      <Label>Maintenance Mode</Label>
-                      <Select defaultValue="disabled">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="enabled">Enabled</SelectItem>
-                          <SelectItem value="disabled">Disabled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline">Reset to Defaults</Button>
-                    <Button>Save Configuration</Button>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
