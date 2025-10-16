@@ -349,7 +349,7 @@ export default function Admin() {
     if (selectedOrder) {
       toast({ 
         title: "Order Details", 
-        description: `Order #${selectedOrder.orderNumber}\nTotal: $${parseFloat(selectedOrder.total).toFixed(2)}\nStatus: ${selectedOrder.status}\nItems: ${selectedOrder.orderItems?.length || 0}` 
+        description: `Order #${selectedOrder.orderNumber}\nTotal: ₹${parseFloat(selectedOrder.total).toFixed(2)}\nStatus: ${selectedOrder.status}\nItems: ${selectedOrder.orderItems?.length || 0}` 
       });
     }
   };
@@ -443,10 +443,10 @@ export default function Admin() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="stat-total-revenue">
-                    ${stats.totalRevenue.toFixed(2)}
+                    ₹{stats.totalRevenue.toFixed(2)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    +${stats.revenueToday.toFixed(2)} today
+                    +₹{stats.revenueToday.toFixed(2)} today
                   </p>
                 </CardContent>
               </Card>
@@ -495,7 +495,7 @@ export default function Admin() {
                           <TableCell>
                             <Badge variant="outline">{order.status}</Badge>
                           </TableCell>
-                          <TableCell>${parseFloat(order.total).toFixed(2)}</TableCell>
+                          <TableCell>₹{parseFloat(order.total).toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -932,7 +932,7 @@ export default function Admin() {
                           </TableCell>
                           <TableCell>{product.sku || "N/A"}</TableCell>
                           <TableCell>{product.category?.name || "Uncategorized"}</TableCell>
-                          <TableCell>${parseFloat(product.price).toFixed(2)}</TableCell>
+                          <TableCell>₹{parseFloat(product.price).toFixed(2)}</TableCell>
                           <TableCell>{product.stock}</TableCell>
                           <TableCell>
                             <Badge variant={product.status === "active" ? "default" : "secondary"}>
@@ -997,7 +997,7 @@ export default function Admin() {
                           <TableCell>{order.user?.email || 'N/A'}</TableCell>
                           <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                           <TableCell>{order.orderItems?.length || 0} items</TableCell>
-                          <TableCell>${parseFloat(order.total).toFixed(2)}</TableCell>
+                          <TableCell>₹{parseFloat(order.total).toFixed(2)}</TableCell>
                           <TableCell>
                             <Select
                               value={order.status}
@@ -1274,7 +1274,7 @@ export default function Admin() {
                               <TableCell className="font-medium">{order.orderNumber}</TableCell>
                               <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                               <TableCell>{order.orderItems?.length || 0} items</TableCell>
-                              <TableCell>${parseFloat(order.total).toFixed(2)}</TableCell>
+                              <TableCell>₹{parseFloat(order.total).toFixed(2)}</TableCell>
                               <TableCell>
                                 <Badge variant={order.status === "delivered" ? "default" : "secondary"}>
                                   {order.status}

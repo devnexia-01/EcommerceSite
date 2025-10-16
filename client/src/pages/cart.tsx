@@ -38,8 +38,8 @@ export default function Cart() {
   };
 
   const subtotal = totalPrice;
-  const shipping = subtotal > 50 ? 0 : 9.99;
-  const tax = subtotal * 0.08; // 8% tax
+  const shipping = subtotal > 500 ? 0 : 99;
+  const tax = subtotal * 0.18; // 18% GST
   const total = subtotal + shipping + tax;
 
   return (
@@ -105,7 +105,7 @@ export default function Cart() {
                           </h3>
                         </Link>
                         <p className="text-sm text-muted-foreground mt-1" data-testid={`cart-item-price-${item.id}`}>
-                          ${parseFloat(item.product.price).toFixed(2)} each
+                          ₹{item.product.price.toFixed(2)} each
                         </p>
                         
                         {item.product.stock < item.quantity && (
@@ -146,7 +146,7 @@ export default function Cart() {
                         {/* Item Total */}
                         <div className="text-right min-w-[5rem]">
                           <span className="font-semibold" data-testid={`item-total-${item.id}`}>
-                            ${(parseFloat(item.product.price) * item.quantity).toFixed(2)}
+                            ₹{(item.product.price * item.quantity).toFixed(2)}
                           </span>
                         </div>
 
@@ -177,30 +177,30 @@ export default function Cart() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
-                      <span data-testid="cart-subtotal">${subtotal.toFixed(2)}</span>
+                      <span data-testid="cart-subtotal">₹{subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Shipping</span>
                       <span className={shipping === 0 ? "text-accent" : ""} data-testid="cart-shipping">
-                        {shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}
+                        {shipping === 0 ? "FREE" : `₹${shipping.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Tax</span>
-                      <span data-testid="cart-tax">${tax.toFixed(2)}</span>
+                      <span>GST (18%)</span>
+                      <span data-testid="cart-tax">₹{tax.toFixed(2)}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-semibold text-lg">
                       <span>Total</span>
-                      <span data-testid="cart-total">${total.toFixed(2)}</span>
+                      <span data-testid="cart-total">₹{total.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  {subtotal < 50 && (
+                  {subtotal < 500 && (
                     <div className="bg-muted p-3 rounded-lg">
                       <p className="text-sm text-muted-foreground">
                         Add <span className="font-medium text-accent">
-                          ${(50 - subtotal).toFixed(2)}
+                          ₹{(500 - subtotal).toFixed(2)}
                         </span> more for free shipping!
                       </p>
                     </div>

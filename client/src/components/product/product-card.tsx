@@ -13,8 +13,8 @@ interface Product {
   id: string;
   name: string;
   slug: string;
-  price: string;
-  comparePrice?: string | null;
+  price: number;
+  comparePrice?: number | null;
   imageUrl: string | null;
   rating: string;
   reviewCount: number;
@@ -118,7 +118,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const discountPercentage = product.comparePrice 
-    ? Math.round(((parseFloat(product.comparePrice) - parseFloat(product.price)) / parseFloat(product.comparePrice)) * 100)
+    ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
     : 0;
 
   return (
@@ -194,11 +194,11 @@ export default function ProductCard({ product }: ProductCardProps) {
             <div className="flex flex-col space-y-3 pt-2">
               <div className="flex items-center space-x-2">
                 <span className="text-lg sm:text-xl lg:text-2xl font-serif font-bold text-foreground" data-testid={`product-price-${product.id}`}>
-                  ${parseFloat(product.price).toFixed(2)}
+                  ₹{product.price.toFixed(2)}
                 </span>
                 {product.comparePrice && (
                   <span className="text-xs sm:text-sm text-muted-foreground line-through" data-testid={`compare-price-${product.id}`}>
-                    ${parseFloat(product.comparePrice).toFixed(2)}
+                    ₹{product.comparePrice.toFixed(2)}
                   </span>
                 )}
               </div>

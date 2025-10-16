@@ -49,7 +49,7 @@ const insertAddressSchema = z.object({
   streetAddress: z.string().min(1),
   city: z.string().min(1),
   state: z.string().min(1),
-  zipCode: z.string().min(1),
+  zipCode: z.string().regex(/^\d{6}$/, "Postal code must be 6 digits"),
   country: z.string().min(1),
   phone: z.string().optional(),
   isDefault: z.boolean().optional()

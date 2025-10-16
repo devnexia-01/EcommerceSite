@@ -27,7 +27,7 @@ const createOrderSchema = z.object({
     streetAddress: z.string(),
     city: z.string(),
     state: z.string(),
-    zipCode: z.string(),
+    zipCode: z.string().regex(/^\d{6}$/, "Postal code must be 6 digits"),
     country: z.string(),
     phone: z.string().optional()
   }),
@@ -37,13 +37,13 @@ const createOrderSchema = z.object({
     streetAddress: z.string(),
     city: z.string(),
     state: z.string(),
-    zipCode: z.string(),
+    zipCode: z.string().regex(/^\d{6}$/, "Postal code must be 6 digits"),
     country: z.string(),
     phone: z.string().optional()
   }),
   paymentMethodId: z.string().optional(),
   shippingMethod: z.string().optional(),
-  currency: z.string().default("USD")
+  currency: z.string().default("INR")
 });
 
 const updateOrderStatusSchema = z.object({
