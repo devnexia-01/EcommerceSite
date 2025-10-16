@@ -816,12 +816,21 @@ export function setupV1Routes(app: any, storage: any) {
     return `TRK${timestamp.slice(-8)}${random}`;
   }
 
-  // 1. POST /api/v1/orders - Create new order
-  app.post("/api/v1/orders", authenticateToken, async (req: any, res: Response) => {
+  // 1. POST /api/v1/orders - Create new order (supports both authenticated and guest COD orders)
+  app.post("/api/v1/orders", async (req: any, res: Response) => {
     try {
       const userId = req.user?.userId || req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
+      const sessionId = req.headers['x-session-id'] as string || req.sessionID;
+      const paymentMethod = req.body.paymentMethod;
+      
+      // For non-COD payments, require authentication
+      if (paymentMethod !== 'cod' && !userId) {
+        return res.status(401).json({ error: "Authentication required for non-COD orders" });
+      }
+      
+      // For COD, allow either userId or sessionId
+      if (paymentMethod === 'cod' && !userId && !sessionId) {
+        return res.status(400).json({ error: "Session required for guest COD orders" });
       }
 
       // Clean and validate the request body
@@ -854,7 +863,8 @@ export function setupV1Routes(app: any, storage: any) {
       };
 
       const orderData: any = {
-        userId,
+        userId: userId || undefined,
+        sessionId: !userId ? sessionId : undefined,
         orderNumber: generateOrderNumber(),
         subtotal: cleanedBody.subtotal?.toString() || "0",
         total: cleanedBody.total?.toString() || "0",
@@ -1133,23 +1143,27 @@ export function setupV1Routes(app: any, storage: any) {
   }
 
   // POST /api/v1/create-razorpay-order - Server-calculated amount from cart (supports COD)
-  app.post("/api/v1/create-razorpay-order", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  app.post("/api/v1/create-razorpay-order", async (req: any, res: Response) => {
     try {
       // Check if this is a COD payment
       const paymentMethod = req.body.paymentMethod || "razorpay";
       
       if (paymentMethod === "cod") {
-        // Handle COD payment - bypass Razorpay entirely
+        // Handle COD payment - bypass Razorpay entirely (supports both authenticated and guest users)
         const userId = req.user?.userId;
-        if (!userId) {
-          return res.status(401).json({ 
+        const sessionId = req.headers['x-session-id'] as string || req.sessionID;
+        
+        if (!userId && !sessionId) {
+          return res.status(400).json({ 
             success: false, 
-            error: "Authentication required" 
+            error: "Session required for guest COD orders" 
           });
         }
 
         // Get cart items from server to calculate amount securely
-        const userCart = await storage.getCartByUser(userId);
+        const userCart = userId ? 
+          await storage.getCartByUser(userId) : 
+          await storage.getCartBySession(sessionId);
         if (!userCart || !userCart.items.length) {
           return res.status(400).json({
             success: false,
@@ -1175,13 +1189,14 @@ export function setupV1Routes(app: any, storage: any) {
         const total = subtotal + shipping + tax;
         
         // Return COD order details without Razorpay
+        const orderIdentifier = userId || sessionId;
         return res.json({
           success: true,
           order: {
-            id: `cod_${Date.now()}_${userId}`,
+            id: `cod_${Date.now()}_${orderIdentifier}`,
             amount: Math.round(total * 100), // Amount in paise
             currency: "INR",
-            receipt: `cod_order_${Date.now()}_${userId}`,
+            receipt: `cod_order_${Date.now()}_${orderIdentifier}`,
             payment_method: "cod",
             status: "created"
           },

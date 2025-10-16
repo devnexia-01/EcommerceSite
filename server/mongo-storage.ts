@@ -553,7 +553,22 @@ export class MongoStorage implements IStorage {
   }
 
   async getOrdersBySession(sessionId: string): Promise<(OrderType & { orderItems: (OrderItemType & { product: ProductType })[] })[]> {
-    return [];
+    const orders = await Order.find({ sessionId }).sort({ createdAt: -1 });
+
+    const ordersWithItems = await Promise.all(
+      orders.map(async (order) => {
+        const items = await OrderItem.find({ orderId: order._id.toString() }).populate('productId');
+        const orderObj = toPlainObject(order);
+        const itemsWithProducts = items.map(item => {
+          const itemObj = toPlainObject(item);
+          const product = item.productId ? toPlainObject(item.productId) : null;
+          return { ...itemObj, product };
+        });
+        return { ...orderObj, orderItems: itemsWithProducts };
+      })
+    );
+
+    return ordersWithItems;
   }
 
   async getOrder(id: string): Promise<(OrderType & { orderItems: (OrderItemType & { product: ProductType })[] }) | undefined> {

@@ -296,9 +296,10 @@ export function setupBuyNowRoutes(app: Express) {
       // Use shipping address as billing address for buy-now orders
       const billingAddressObj = { ...shippingAddressObj };
 
-      // Create order record - use authenticated user ID from session
+      // Create order record - use userId for authenticated users, sessionId for guests
       const orderData = {
-        userId: req.session.userId!,
+        userId: userId || undefined,
+        sessionId: !userId ? sessionId : undefined,
         orderNumber: orderNumber,
         status: 'pending',
         subtotal: subtotal.toFixed(2),

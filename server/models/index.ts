@@ -322,7 +322,8 @@ export const CartItem = mongoose.model<ICartItem>('CartItem', cartItemSchema);
 // Order Model
 export interface IOrder extends Document {
   orderNumber: string;
-  userId: string;
+  userId?: string;
+  sessionId?: string;
   status: string;
   type: string;
   channel: string;
@@ -348,7 +349,8 @@ export interface IOrder extends Document {
 const orderSchema = new Schema<IOrder>({
   _id: { type: String, required: true },
   orderNumber: { type: String, required: true, unique: true },
-  userId: { type: String, ref: 'User', required: true },
+  userId: { type: String, ref: 'User' },
+  sessionId: String,
   status: { type: String, default: 'pending' },
   type: { type: String, default: 'standard' },
   channel: { type: String, default: 'web' },

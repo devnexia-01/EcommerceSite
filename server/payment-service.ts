@@ -187,9 +187,14 @@ export async function processCODPayment(req: AuthenticatedRequest, res: Response
       });
     }
 
-    // Verify order ownership - user must own this order
+    // Verify order ownership - check both userId (for logged-in users) and sessionId (for guests)
     const userId = req.user?.userId || req.user?.id;
-    if (order.userId?.toString() !== userId?.toString()) {
+    const sessionId = req.headers['x-session-id'] as string || req.sessionID;
+    
+    const isOwner = (order.userId && order.userId?.toString() === userId?.toString()) || 
+                   (order.sessionId && order.sessionId === sessionId);
+    
+    if (!isOwner) {
       return res.status(403).json({
         success: false,
         error: "Access denied - you do not own this order"

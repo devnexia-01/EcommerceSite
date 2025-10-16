@@ -196,8 +196,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/v1/payments/wallet/apple-pay", authenticateToken, processApplePay);
   app.post("/api/v1/payments/wallet/google-pay", authenticateToken, processGooglePay);
   
-  // Cash on Delivery (COD) Payments
-  app.post("/api/v1/payments/cod", authenticateToken, processCODPayment);
+  // Cash on Delivery (COD) Payments (supports both authenticated and guest users)
+  app.post("/api/v1/payments/cod", processCODPayment);
   app.post("/api/v1/payments/cod/confirm", authenticateToken, confirmCODPayment);
   
   // Setup wishlist routes
