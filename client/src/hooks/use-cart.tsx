@@ -7,7 +7,7 @@ import { useToast } from "./use-toast";
 interface Product {
   id: string;
   name: string;
-  price: string;
+  price: number;
   imageUrl: string | null;
   stock: number;
 }
@@ -110,7 +110,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const totalItems = items.reduce((sum: number, item: CartItem) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum: number, item: CartItem) => 
-    sum + (parseFloat(item.product.price) * item.quantity), 0);
+    sum + (item.product.price * item.quantity), 0);
 
   const value: CartContextType = {
     items,

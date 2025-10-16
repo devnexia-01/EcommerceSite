@@ -88,7 +88,7 @@ export class CartService {
           cartId: item.cartId,
           productId: item.productId,
           quantity: item.quantity,
-          price: item.price.toString(),
+          price: item.price,
           addedAt: item.addedAt || new Date(),
           product: product
         };
@@ -161,7 +161,7 @@ export class CartService {
       cartId: cartItem.cartId,
       productId: cartItem.productId,
       quantity: cartItem.quantity,
-      price: cartItem.price.toString(),
+      price: cartItem.price,
       addedAt: cartItem.addedAt || new Date(),
       product: product
     };

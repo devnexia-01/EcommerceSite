@@ -44,7 +44,7 @@ export default function Admin() {
       name: "",
       slug: "",
       description: "",
-      price: "",
+      price: 0,
       stock: 0,
       categoryId: "",
       sku: "",
@@ -805,7 +805,13 @@ export default function Admin() {
                               <FormItem>
                                 <FormLabel>Price</FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.01" {...field} data-testid="product-price" />
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    {...field} 
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    data-testid="product-price" 
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
