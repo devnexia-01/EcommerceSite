@@ -51,11 +51,12 @@ export type InsertPaymentTransaction = Partial<import('../server/models/index').
 
 // Validation schemas for frontend forms
 export const insertProductSchema = z.object({
-  name: z.string().min(1),
-  slug: z.string().min(1),
+  name: z.string().min(1, "Product name is required"),
+  sku: z.string().min(1, "SKU is required"),
+  slug: z.string().optional(),
   description: z.string().optional(),
-  price: z.number().min(0),
-  stock: z.number().int().min(0).default(0),
+  price: z.coerce.number().positive("Price must be positive"),
+  stock: z.coerce.number().int().min(0).default(0),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
   imageUrl: z.string().optional(),

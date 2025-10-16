@@ -161,13 +161,98 @@ export async function processGooglePay(req: AuthenticatedRequest, res: Response)
 // COD Payment
 
 export async function processCODPayment(req: AuthenticatedRequest, res: Response) {
-  res.status(501).json({
-    error: "COD payment not yet implemented - PaymentTransaction model needs to be created"
-  });
+  try {
+    const { orderId, amount, currency = "INR", deliveryAddress } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: "Order ID is required"
+      });
+    }
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Valid amount is required"
+      });
+    }
+
+    // Verify order exists
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found"
+      });
+    }
+
+    // Verify order ownership - user must own this order
+    const userId = req.user?.userId || req.user?.id;
+    if (order.userId?.toString() !== userId?.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied - you do not own this order"
+      });
+    }
+
+    // Update order payment status to COD
+    order.paymentMethod = 'cod';
+    order.paymentStatus = 'pending';
+    await order.save();
+
+    res.json({
+      success: true,
+      status: "confirmed",
+      message: "Your order will be delivered and payment will be collected at the time of delivery",
+      orderId,
+      paymentMethod: "cod",
+      amount,
+      currency
+    });
+  } catch (error) {
+    console.error("Error processing COD payment:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to process COD payment"
+    });
+  }
 }
 
 export async function confirmCODPayment(req: AuthenticatedRequest, res: Response) {
-  res.status(501).json({
-    error: "COD confirmation not yet implemented - PaymentTransaction model needs to be created"
-  });
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: "Order ID is required"
+      });
+    }
+
+    // Verify order exists
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found"
+      });
+    }
+
+    // Mark payment as confirmed (for admin use)
+    order.paymentStatus = 'completed';
+    await order.save();
+
+    res.json({
+      success: true,
+      message: "COD payment confirmed",
+      orderId
+    });
+  } catch (error) {
+    console.error("Error confirming COD payment:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to confirm COD payment"
+    });
+  }
 }
